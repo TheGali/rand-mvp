@@ -1,0 +1,14 @@
+[
+  {"number": 1, "name": "Roof", "aliases": ["Roofing", "Roof System"]},
+  {"number": 2, "name": "Exterior Walls / Facade", "aliases": ["Facade", "Exterior", "Ext Walls", "Exterior Walls"]},
+  {"number": 3, "name": "Windows", "aliases": ["Window", "Fenestration", "Glazing"]},
+  {"number": 4, "name": "Interior Finishes", "aliases": ["Interior", "Finishes", "Int Finishes"]},
+  {"number": 5, "name": "Plumbing", "aliases": ["Plumbing System", "Domestic Water"]},
+  {"number": 6, "name": "HVAC", "aliases": ["Heating", "Cooling", "Mechanical", "HVAC System"]},
+  {"number": 7, "name": "Electrical", "aliases": ["Electrical System", "Power"]},
+  {"number": 8, "name": "Elevators", "aliases": ["Elevator", "Vertical Transport", "Conveying"]},
+  {"number": 9, "name": "Fire Protection", "aliases": ["Fire Safety", "Sprinkler", "Fire Alarm"]},
+  {"number": 10, "name": "Site / Grounds", "aliases": ["Site", "Grounds", "Landscaping", "Pavement"]},
+  {"number": 11, "name": "Structure", "aliases": ["Structural", "Foundation", "Superstructure"]},
+  {"number": 12, "name": "Common Areas", "aliases": ["Lobby", "Hallways", "Corridors"]}
+]

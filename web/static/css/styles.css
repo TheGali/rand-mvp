@@ -1,0 +1,247 @@
+/* RAND MVP — Custom overrides */
+
+/* Condition badge colors */
+.badge-poor { background-color: #fecaca; color: #991b1b; }
+.badge-fair { background-color: #fef3c7; color: #92400e; }
+.badge-good { background-color: #d1fae5; color: #065f46; }
+.badge-satisfactory { background-color: #dbeafe; color: #1e40af; }
+.badge-critical { background-color: #fee2e2; color: #7f1d1d; font-weight: 600; }
+
+/* Command center row highlight */
+.obs-row-selected {
+    background-color: #fef2f2 !important;
+    border-left: 3px solid #E21836;
+}
+
+/* Scrollable panels */
+.panel-scroll {
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+/* Approval & flag icons in table */
+.icon-approved {
+    color: #16a34a;
+    font-size: 0.875rem;
+}
+.icon-pending {
+    color: #d1d5db;
+    font-size: 0.875rem;
+}
+.icon-flag-unreviewed {
+    color: #d97706;
+    font-size: 0.875rem;
+}
+.icon-flag-reviewed {
+    color: #16a34a;
+    font-size: 0.75rem;
+}
+
+/* Truncated table cells */
+.cell-truncate {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Approve button states */
+.btn-approve {
+    background-color: #16a34a;
+    color: #fff;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    transition: all 0.15s;
+    border: 2px solid #16a34a;
+}
+.btn-approve:hover { background-color: #15803d; border-color: #15803d; }
+.btn-approve:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-approved {
+    background-color: #fff;
+    color: #16a34a;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    border: 2px solid #16a34a;
+    transition: all 0.15s;
+}
+.btn-approved:hover { background-color: #f0fdf4; }
+
+/* Filter chip */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.filter-chip:hover { border-color: #9ca3af; }
+.filter-chip-active {
+    background-color: #fef3c7;
+    border-color: #d97706;
+    color: #92400e;
+}
+
+/* Slide-over detail panel */
+.slideover-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.15);
+    z-index: 20;
+}
+
+.slideover-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 55%;
+    max-width: 720px;
+    background: #f9fafb;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+}
+
+.slideover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff;
+    flex-shrink: 0;
+}
+
+.slideover-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    color: #6b7280;
+    transition: all 0.15s;
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+.slideover-close:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+@media (max-width: 768px) {
+    .slideover-panel {
+        width: 100%;
+        max-width: none;
+    }
+}
+
+/* Approved row tint */
+.obs-row-approved {
+    background-color: #f0fdf4;
+}
+
+/* ── Funding Summary (Appendix A) ── */
+
+/* Tab bar */
+.tab-bar { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; }
+.tab-btn {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.tab-btn:hover { color: #111827; }
+.tab-btn-active {
+    color: #1A1A1A;
+    border-bottom-color: #1A1A1A;
+}
+
+/* Category header row (A. Building Exterior) */
+.funding-cat-row {
+    background-color: #f3f4f6;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    color: #111827;
+}
+.funding-cat-row td { padding: 0.5rem 0.75rem; }
+
+/* System subtotal row (1. Roof) */
+.funding-sys-row {
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    color: #1f2937;
+    transition: background 0.1s;
+}
+.funding-sys-row:hover { background-color: #f9fafb; }
+.funding-sys-row td { padding: 0.4rem 0.75rem; }
+
+/* Observation row (a. Membrane...) */
+.funding-obs-row {
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: #4b5563;
+    transition: background 0.1s;
+}
+.funding-obs-row:hover { background-color: #fef2f2; }
+.funding-obs-row td { padding: 0.35rem 0.75rem; }
+
+/* Grand total row */
+.funding-total-row {
+    background-color: #f9fafb;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    border-top: 2px solid #d1d5db;
+}
+.funding-total-row td { padding: 0.5rem 0.75rem; }
+
+/* Recommendation type badges */
+.rec-badge {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.rec-badge-current { background-color: #fee2e2; color: #991b1b; }
+.rec-badge-future  { background-color: #dbeafe; color: #1e40af; }
+.rec-badge-info    { background-color: #f3f4f6; color: #6b7280; }
+
+/* Chevron icon for expandable rows */
+.chevron {
+    display: inline-block;
+    transition: transform 0.15s;
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+}
+.chevron-open { transform: rotate(90deg); }
+
+/* SSE progress bar animation */
+.progress-pulse {
+    animation: pulse-bg 1.5s ease-in-out infinite;
+}
+@keyframes pulse-bg {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}

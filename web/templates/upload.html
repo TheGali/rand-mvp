@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Upload — RAND Engineering{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8" x-data="uploadApp()">
+
+    <!-- Upload Area -->
+    <div class="bg-white rounded-xl shadow-sm border p-8 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Upload Field Survey</h2>
+        <p class="text-gray-500 text-sm mb-6">Upload a PowerPoint file (.pptx) from the field survey. The system will extract photos and field notes for AI processing.</p>
+
+        <div
+            class="border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer"
+            :class="dragOver ? 'border-rand-red bg-red-50' : 'border-gray-300 hover:border-gray-400'"
+            @dragover.prevent="dragOver = true"
+            @dragleave.prevent="dragOver = false"
+            @drop.prevent="handleDrop($event)"
+            @click="$refs.fileInput.click()"
+        >
+            <input type="file" accept=".pptx" class="hidden" x-ref="fileInput" @change="handleFileSelect($event)">
+
+            <template x-if="!uploading && !uploadError">
+                <div>
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-gray-600 font-medium">Drop your .pptx file here</p>
+                    <p class="text-gray-400 text-sm mt-1">or click to browse</p>
+                </div>
+            </template>
+
+            <template x-if="uploading">
+                <div>
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-rand-red mb-3"></div>
+                    <p class="text-gray-600 font-medium">Uploading and parsing...</p>
+                    <p class="text-gray-400 text-sm mt-1" x-text="fileName"></p>
+                </div>
+            </template>
+
+            <template x-if="uploadError">
+                <div>
+                    <p class="text-red-600 font-medium" x-text="uploadError"></p>
+                    <p class="text-gray-400 text-sm mt-2 cursor-pointer hover:text-gray-600">Click to try again</p>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Previous Jobs -->
+    {% if jobs %}
+    <div class="bg-white rounded-xl shadow-sm border p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Previous Surveys</h3>
+        <div class="space-y-2">
+            {% for job in jobs %}
+            <a
+                href="{% if job.status == 'completed' %}/dashboard/{{ job.id }}{% elif job.status == 'processing' %}/processing/{{ job.id }}{% else %}/processing/{{ job.id }}{% endif %}"
+                class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition border border-transparent hover:border-gray-200"
+            >
+                <div>
+                    <span class="font-medium text-gray-900">{{ job.building_name or job.filename }}</span>
+                    <span class="text-gray-400 text-sm ml-2">{{ job.observation_count }} observations</span>
+                </div>
+                <span class="text-xs font-medium px-2 py-1 rounded-full
+                    {% if job.status == 'completed' %}bg-green-100 text-green-700
+                    {% elif job.status == 'processing' %}bg-blue-100 text-blue-700
+                    {% else %}bg-gray-100 text-gray-600{% endif %}
+                ">{{ job.status }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function uploadApp() {
+    return {
+        dragOver: false,
+        uploading: false,
+        uploadError: null,
+        fileName: '',
+
+        handleDrop(e) {
+            this.dragOver = false;
+            const files = e.dataTransfer.files;
+            if (files.length > 0) this.uploadFile(files[0]);
+        },
+
+        handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) this.uploadFile(files[0]);
+        },
+
+        async uploadFile(file) {
+            if (!file.name.endsWith('.pptx')) {
+                this.uploadError = 'Please select a .pptx file';
+                return;
+            }
+
+            this.uploading = true;
+            this.uploadError = null;
+            this.fileName = file.name;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const resp = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (resp.ok && data.job_id) {
+                    window.location.href = `/processing/${data.job_id}`;
+                } else {
+                    this.uploadError = data.error || 'Upload failed';
+                    this.uploading = false;
+                }
+            } catch (err) {
+                this.uploadError = 'Network error — please try again';
+                this.uploading = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

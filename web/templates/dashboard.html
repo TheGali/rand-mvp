@@ -1,0 +1,807 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ job.building_name or 'Survey' }}{% endblock %}
+
+{% block nav_actions %}
+<div class="relative" x-data="{ open: false }" x-init="$nextTick(() => { window._dashRef = $el })">
+    <button @click="open = !open" class="bg-white text-rand-black font-medium rounded-lg px-3 py-1.5 text-sm hover:bg-gray-100 transition flex items-center gap-1">
+        Generate Report
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-1 bg-white rounded-lg shadow-lg border py-1 w-48 z-50">
+        <button @click="generateReport('pptx'); open = false" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Download PPTX Report</button>
+        <button @click="generateReport('pdf'); open = false" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Download PDF Report</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div x-data="dashboardApp()" @keydown.escape.window="if (panelOpen) closePanel()" class="h-[calc(100vh-56px)] flex flex-col">
+
+    <!-- Header bar -->
+    <div class="bg-white border-b px-4 py-3 flex items-center justify-between shrink-0">
+        <div>
+            <span class="font-semibold text-gray-900">{{ job.building_name }}</span>
+            <span class="text-gray-400 mx-2">&mdash;</span>
+            <span class="text-gray-500 text-sm">{{ job.address }}</span>
+        </div>
+        <div class="text-sm text-gray-500 flex items-center gap-3">
+            <span><span x-text="observations.length"></span> observations</span>
+            <template x-if="approvedCount > 0">
+                <span class="text-green-600"><span x-text="approvedCount"></span>/<span x-text="observations.length"></span> approved</span>
+            </template>
+            <template x-if="flagCount > 0">
+                <span class="text-amber-600"><span x-text="flagCount"></span> flags</span>
+            </template>
+        </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar bg-white px-4 shrink-0">
+        <button class="tab-btn" :class="view === 'table' && 'tab-btn-active'" @click="view = 'table'">Observations</button>
+        <button class="tab-btn" :class="view === 'funding' && 'tab-btn-active'" @click="view = 'funding'">Funding Summary</button>
+    </div>
+
+    <!-- Main content area -->
+    <div class="flex-1 min-h-0 relative">
+
+        <!-- Full-width Table -->
+        <div x-show="view === 'table'" class="absolute inset-0 flex flex-col bg-white">
+            <!-- Filters -->
+            <div class="p-3 border-b flex gap-2 flex-wrap shrink-0">
+                <input
+                    type="text"
+                    x-model="searchQuery"
+                    placeholder="Search..."
+                    class="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red focus:border-transparent"
+                >
+                <select x-model="filterSystem" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                    <option value="">All Systems</option>
+                    <template x-for="sys in systems" :key="sys">
+                        <option :value="sys" x-text="sys"></option>
+                    </template>
+                </select>
+                <select x-model="filterCondition" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                    <option value="">All Conditions</option>
+                    <template x-for="cond in conditions" :key="cond">
+                        <option :value="cond" x-text="cond"></option>
+                    </template>
+                </select>
+                <button
+                    @click="filterFlags = !filterFlags"
+                    class="filter-chip"
+                    :class="filterFlags ? 'filter-chip-active' : ''"
+                >
+                    <span>&#9888;</span>
+                    Flags
+                    <template x-if="flagCount > 0">
+                        <span class="ml-0.5" x-text="'(' + flagCount + ')'"></span>
+                    </template>
+                </button>
+            </div>
+
+            <!-- Table -->
+            <div class="flex-1 panel-scroll overflow-x-auto">
+                <table class="w-full text-sm min-w-[640px]">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr class="text-left text-gray-500 text-xs uppercase tracking-wider">
+                            <th class="px-2 py-2 w-12">#</th>
+                            <th class="px-2 py-2 w-8" title="Approved">&#10003;</th>
+                            <th class="px-2 py-2" style="width:140px">System</th>
+                            <th class="px-2 py-2" style="width:120px">Component</th>
+                            <th class="px-2 py-2" style="width:120px">Location</th>
+                            <th class="px-2 py-2 w-16">Cond</th>
+                            <th class="px-2 py-2 w-16">Priority</th>
+                            <th class="px-2 py-2 w-20 text-right">Cost</th>
+                            <th class="px-2 py-2" :class="panelOpen ? 'hidden' : ''">Prose</th>
+                            <th class="px-2 py-2" :class="panelOpen ? 'hidden' : ''" style="width:200px">Recommendation</th>
+                            <th class="px-2 py-2 w-8 text-center" title="Flags">&#9888;</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="obs in filteredObservations" :key="obs.obs_number">
+                            <tr
+                                @click="selectObs(obs)"
+                                class="border-b cursor-pointer hover:bg-gray-50 transition"
+                                :class="{
+                                    'obs-row-selected': selectedObs?.obs_number === obs.obs_number,
+                                    'obs-row-approved': obs.approved && selectedObs?.obs_number !== obs.obs_number
+                                }"
+                            >
+                                <td class="px-2 py-2 font-mono text-xs font-medium" x-text="obs.obs_number"></td>
+                                <td class="px-2 py-2 text-center">
+                                    <span x-show="obs.approved" class="icon-approved" title="Approved">&#10003;</span>
+                                    <span x-show="!obs.approved" class="icon-pending" title="Not reviewed">&#9675;</span>
+                                </td>
+                                <td class="px-2 py-2 cell-truncate" style="max-width:140px">
+                                    <span class="text-gray-900 text-xs" x-text="obs.system || obs.section_name"></span>
+                                </td>
+                                <td class="px-2 py-2 cell-truncate" style="max-width:120px">
+                                    <span class="text-gray-700 text-xs" x-text="obs.component || '—'"></span>
+                                </td>
+                                <td class="px-2 py-2 cell-truncate" style="max-width:120px">
+                                    <span class="text-gray-700 text-xs" x-text="obs.location || '—'"></span>
+                                </td>
+                                <td class="px-2 py-2">
+                                    <span class="text-xs font-medium px-1.5 py-0.5 rounded-full"
+                                        :class="conditionBadge(obs.condition)"
+                                        x-text="obs.condition || '—'"
+                                    ></span>
+                                </td>
+                                <td class="px-2 py-2 text-xs text-gray-600" x-text="obs.priority || '—'"></td>
+                                <td class="px-2 py-2 text-right text-xs text-gray-600">
+                                    <span x-text="obs.cost_high > 0 ? '$' + Number(obs.cost_high).toLocaleString() : '—'"></span>
+                                </td>
+                                <td class="px-2 py-2 cell-truncate" :class="panelOpen ? 'hidden' : ''" style="max-width:250px">
+                                    <span class="text-gray-600 text-xs" x-text="obs.prose || '—'"></span>
+                                </td>
+                                <td class="px-2 py-2 cell-truncate" :class="panelOpen ? 'hidden' : ''" style="max-width:200px">
+                                    <span class="text-gray-600 text-xs" x-text="obs.recommendation || '—'"></span>
+                                </td>
+                                <td class="px-2 py-2 text-center">
+                                    <template x-if="obs.flags && obs.flags.length > 0">
+                                        <span x-show="!obs.flags_reviewed" class="icon-flag-unreviewed" title="Unreviewed flags">&#9888;</span>
+                                    </template>
+                                    <template x-if="obs.flags && obs.flags.length > 0">
+                                        <span x-show="obs.flags_reviewed" class="icon-flag-reviewed" title="Flags reviewed">&#10003;</span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Funding Summary (Appendix A) -->
+        <div x-show="view === 'funding'" class="absolute inset-0 flex flex-col bg-white">
+            <div class="flex-1 panel-scroll overflow-x-auto">
+                <table class="w-full text-sm min-w-[800px]">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr class="text-left text-gray-500 text-xs uppercase tracking-wider">
+                            <th class="px-3 py-2" style="min-width:280px">Report Items</th>
+                            <th class="px-2 py-2 w-20 text-center">Type</th>
+                            <th class="px-2 py-2 w-24 text-right">Curr. Rec.</th>
+                            <th class="px-2 py-2 w-24 text-right">Yrs 1-3</th>
+                            <th class="px-2 py-2 w-24 text-right">Yrs 4-6</th>
+                            <th class="px-2 py-2 w-24 text-right">Yrs 7-9</th>
+                            <th class="px-2 py-2 w-24 text-right">Yrs 10-12</th>
+                            <th class="px-2 py-2 w-24 text-right">Yrs 13-15</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="row in fundingRows" :key="row.key">
+                            <tr x-show="row.type !== 'obs' || expandedSystems[row.sectionKey]"
+                                :class="{
+                                    'funding-cat-row': row.type === 'category',
+                                    'funding-sys-row border-b': row.type === 'system',
+                                    'funding-obs-row border-b': row.type === 'obs',
+                                }"
+                                @click="row.type === 'system' ? toggleSystem(row.sectionKey) : (row.type === 'obs' ? selectObs(row.obs) : null)"
+                            >
+                                <!-- Category row -->
+                                <template x-if="row.type === 'category'">
+                                    <td colspan="8" x-text="row.label"></td>
+                                </template>
+
+                                <!-- System subtotal row -->
+                                <template x-if="row.type === 'system'">
+                                    <td class="pl-6">
+                                        <span class="chevron" :class="expandedSystems[row.sectionKey] && 'chevron-open'">&#9654;</span>
+                                        <span x-text="row.label"></span>
+                                        <span class="text-gray-400 text-xs ml-1" x-text="'(' + row.obsCount + ')'"></span>
+                                    </td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['curr'])"></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['1-3'])"></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['4-6'])"></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['7-9'])"></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['10-12'])"></td>
+                                </template>
+                                <template x-if="row.type === 'system'">
+                                    <td class="text-right text-xs" x-text="formatK(row.buckets?.['13-15'])"></td>
+                                </template>
+
+                                <!-- Observation row -->
+                                <template x-if="row.type === 'obs'">
+                                    <td class="pl-12">
+                                        <span class="text-gray-400 mr-1" x-text="row.letter + '.'"></span>
+                                        <span x-text="row.label"></span>
+                                    </td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-center">
+                                        <span class="rec-badge"
+                                            :class="row.recType === 'Current' ? 'rec-badge-current' : row.recType === 'Future' ? 'rec-badge-future' : 'rec-badge-info'"
+                                            x-text="row.recType === 'Current' ? 'Curr.' : row.recType === 'Future' ? 'Future' : 'Info'"></span>
+                                    </td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === 'curr' ? formatK(row.cost) : ''"></td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === '1-3' ? formatK(row.cost) : (row.recType === 'Info' ? '*' : '')"></td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === '4-6' ? formatK(row.cost) : ''"></td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === '7-9' ? formatK(row.cost) : ''"></td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === '10-12' ? formatK(row.cost) : ''"></td>
+                                </template>
+                                <template x-if="row.type === 'obs'">
+                                    <td class="text-right text-xs" x-text="row.bucket === '13-15' ? formatK(row.cost) : ''"></td>
+                                </template>
+                            </tr>
+                        </template>
+                        <!-- Grand total -->
+                        <tr class="funding-total-row">
+                            <td class="px-3">TOTAL</td>
+                            <td></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('curr'))"></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('1-3'))"></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('4-6'))"></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('7-9'))"></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('10-12'))"></td>
+                            <td class="text-right text-xs" x-text="formatK(grandTotal('13-15'))"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide-over backdrop -->
+        <template x-if="panelOpen">
+            <div class="slideover-backdrop" @click="closePanel()"></div>
+        </template>
+
+        <!-- Slide-over detail panel -->
+        <div
+            x-show="panelOpen"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="translate-x-full"
+            class="slideover-panel"
+            x-cloak
+        >
+            <!-- Sticky header -->
+            <div class="slideover-header">
+                <div class="flex items-center gap-3">
+                    <span class="font-semibold text-gray-900 text-sm" x-text="'Observation ' + (selectedObs?.obs_number || '')"></span>
+                    <template x-if="selectedObs?.approved">
+                        <span class="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Approved</span>
+                    </template>
+                </div>
+                <button class="slideover-close" @click="closePanel()" title="Close (Esc)">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Scrollable body -->
+            <div class="flex-1 panel-scroll p-6">
+                <template x-if="selectedObs">
+                    <div>
+                        <!-- Photo -->
+                        <div class="mb-5">
+                            <template x-if="hasImage(selectedObs)">
+                                <img
+                                    :src="'/image/{{ job.id }}/' + selectedObs.obs_number"
+                                    class="w-full max-w-xl rounded-lg shadow-sm border"
+                                    :alt="'Photo ' + selectedObs.obs_number"
+                                >
+                            </template>
+                            <template x-if="!hasImage(selectedObs)">
+                                <div class="w-full max-w-xl h-48 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
+                                    No photo available
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Field Notes (always visible, read-only) -->
+                        <div class="mb-5">
+                            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Original Field Notes</label>
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap font-mono" x-text="selectedObs.raw_text"></div>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="border-t border-gray-300 my-5 relative">
+                            <span class="absolute -top-2.5 left-4 bg-gray-50 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">AI-Generated (editable)</span>
+                        </div>
+
+                        <!-- Editable fields -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Caption</label>
+                                <input type="text" x-model="editFields.caption" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">System</label>
+                                    <input type="text" x-model="editFields.system" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Component</label>
+                                    <input type="text" x-model="editFields.component" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Location</label>
+                                <input type="text" x-model="editFields.location" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Condition</label>
+                                    <select x-model="editFields.condition" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rand-red" @change="markDirty()">
+                                        <option value="Critical">Critical</option>
+                                        <option value="Poor">Poor</option>
+                                        <option value="Fair">Fair</option>
+                                        <option value="Satisfactory">Satisfactory</option>
+                                        <option value="Good">Good</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Priority</label>
+                                    <select x-model="editFields.priority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rand-red" @change="markDirty()">
+                                        <option value="Immediate">Immediate</option>
+                                        <option value="Year 1-2">Year 1-2</option>
+                                        <option value="Year 1-3">Year 1-3</option>
+                                        <option value="Year 3-5">Year 3-5</option>
+                                        <option value="Year 6-10">Year 6-10</option>
+                                        <option value="Year 10+">Year 10+</option>
+                                        <option value="Capital Planning">Capital Planning</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Cost Low ($)</label>
+                                    <input type="number" x-model.number="editFields.cost_low" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Cost High ($)</label>
+                                    <input type="number" x-model.number="editFields.cost_high" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Prose</label>
+                                <textarea x-model="editFields.prose" rows="5" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red resize-y" @input="markDirty()"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Recommendation</label>
+                                <textarea x-model="editFields.recommendation" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red resize-y" @input="markDirty()"></textarea>
+                            </div>
+
+                            <!-- Flags -->
+                            <template x-if="selectedObs.flags && selectedObs.flags.length > 0">
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                                    <div class="flex items-center gap-2 text-xs font-medium text-amber-800 uppercase tracking-wider">
+                                        <span>&#9888;</span> Flags
+                                    </div>
+                                    <template x-for="flag in selectedObs.flags" :key="flag.type + flag.message">
+                                        <div class="flex items-start gap-2 text-sm text-amber-800">
+                                            <span class="shrink-0 mt-0.5">&#9888;</span>
+                                            <span><span class="font-medium" x-text="flag.type"></span>: <span x-text="flag.message"></span></span>
+                                        </div>
+                                    </template>
+                                    <label class="flex items-center gap-2 pt-1 cursor-pointer text-sm text-gray-700">
+                                        <input type="checkbox" :checked="selectedObs.flags_reviewed" @change="toggleFlagsReviewed()" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                        I have reviewed these flags
+                                    </label>
+                                </div>
+                            </template>
+
+                            <!-- Save + Approve buttons -->
+                            <div class="flex items-center gap-3 pt-2">
+                                <button
+                                    @click="saveChanges()"
+                                    :disabled="!dirty || saving"
+                                    class="bg-rand-black text-white font-medium rounded-lg px-5 py-2 text-sm transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-opacity-90"
+                                >
+                                    <span x-show="!saving">Save Changes</span>
+                                    <span x-show="saving">Saving...</span>
+                                </button>
+                                <button
+                                    @click="toggleApproval()"
+                                    :disabled="hasFlags(selectedObs) && !selectedObs.flags_reviewed"
+                                    :class="selectedObs.approved ? 'btn-approved' : 'btn-approve'"
+                                >
+                                    <span x-text="selectedObs.approved ? 'Approved \u2713' : 'Approve'"></span>
+                                </button>
+                                <template x-if="saveSuccess">
+                                    <span class="text-green-600 text-sm font-medium">&#10003; Saved</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function dashboardApp() {
+    const jobData = {{ job | tojson }};
+    const observations = jobData.processed_observations || [];
+
+    // Build image lookup from raw observations
+    const imageMap = {};
+    (jobData.observations || []).forEach(obs => {
+        if (obs.image_filename) imageMap[obs.obs_number] = true;
+    });
+
+    // Ensure boolean fields exist on every observation
+    observations.forEach(o => {
+        if (o.approved === undefined) o.approved = false;
+        if (o.flags_reviewed === undefined) o.flags_reviewed = false;
+    });
+
+    // ── Category mapping for Appendix A ──
+    const CATEGORY_MAP = {
+        'A': ['Roof', 'Exterior Walls', 'Facade', 'Windows', 'Interior Finishes', 'Interior', 'Site', 'Grounds', 'Common Areas'],
+        'B': ['HVAC', 'Electrical', 'Plumbing', 'Fire Protection', 'Elevators', 'Elevator', 'Structure', 'Structural', 'Foundation'],
+    };
+
+    function sectionToCategory(sectionName) {
+        const s = (sectionName || '').toLowerCase();
+        for (const kw of CATEGORY_MAP['A']) {
+            if (s.includes(kw.toLowerCase())) return 'A';
+        }
+        for (const kw of CATEGORY_MAP['B']) {
+            if (s.includes(kw.toLowerCase())) return 'B';
+        }
+        return 'C';
+    }
+
+    const CATEGORY_LABELS = {
+        'A': 'A. Building Exterior and Interiors',
+        'B': 'B. Essential Services',
+        'C': 'C. Other',
+    };
+
+    function priorityToBucket(priority) {
+        const p = (priority || '').toLowerCase().trim();
+        if (p === 'immediate' || p === 'year 1') return 'curr';
+        if (p === 'year 1-2' || p === 'year 1-3' || p === 'year 2-3') return '1-3';
+        if (p === 'year 2-4' || p === 'year 3-5' || p === 'year 1-5' || p === 'year 4-5') return '4-6';
+        if (p === 'year 6-10' || p === 'year 5-10') return '7-9';
+        if (p === 'year 10+' || p === 'year 10-15') return '10-12';
+        if (p === 'capital planning') return '13-15';
+        return 'info'; // Ongoing, empty, etc.
+    }
+
+    function getRecType(obs) {
+        if (!obs.cost_high || obs.cost_high <= 0) return 'Info';
+        const bucket = priorityToBucket(obs.priority);
+        if (bucket === 'curr') return 'Current';
+        return 'Future';
+    }
+
+    return {
+        observations,
+        selectedObs: null,
+        editFields: {},
+        dirty: false,
+        saving: false,
+        saveSuccess: false,
+        searchQuery: '',
+        filterSystem: '',
+        filterCondition: '',
+        filterFlags: false,
+        panelOpen: false,
+        view: 'table',
+        expandedSystems: {},
+
+        get systems() {
+            return [...new Set(this.observations.map(o => o.system || o.section_name).filter(Boolean))].sort();
+        },
+
+        get conditions() {
+            return [...new Set(this.observations.map(o => o.condition).filter(Boolean))].sort();
+        },
+
+        get flagCount() {
+            return this.observations.filter(o => o.flags && o.flags.length > 0).length;
+        },
+
+        get approvedCount() {
+            return this.observations.filter(o => o.approved).length;
+        },
+
+        get unapprovedCount() {
+            return this.observations.length - this.approvedCount;
+        },
+
+        get filteredObservations() {
+            let result = this.observations;
+            if (this.filterSystem) {
+                result = result.filter(o => (o.system || o.section_name) === this.filterSystem);
+            }
+            if (this.filterCondition) {
+                result = result.filter(o => o.condition === this.filterCondition);
+            }
+            if (this.filterFlags) {
+                result = result.filter(o => o.flags && o.flags.length > 0);
+            }
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase();
+                result = result.filter(o =>
+                    (o.obs_number || '').toLowerCase().includes(q) ||
+                    (o.system || '').toLowerCase().includes(q) ||
+                    (o.component || '').toLowerCase().includes(q) ||
+                    (o.location || '').toLowerCase().includes(q) ||
+                    (o.prose || '').toLowerCase().includes(q) ||
+                    (o.raw_text || '').toLowerCase().includes(q) ||
+                    (o.caption || '').toLowerCase().includes(q)
+                );
+            }
+            return result;
+        },
+
+        // ── Funding Summary methods ──
+
+        toggleSystem(sectionKey) {
+            this.expandedSystems = {
+                ...this.expandedSystems,
+                [sectionKey]: !this.expandedSystems[sectionKey]
+            };
+        },
+
+        formatK(amount) {
+            if (!amount || amount <= 0) return '$0';
+            if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';
+            if (amount >= 1000) return '$' + Math.round(amount / 1000) + 'K';
+            return '$' + amount.toLocaleString();
+        },
+
+        get fundingRows() {
+            // Group observations by section number (from obs_number prefix)
+            const sectionGroups = {};
+            this.observations.forEach(obs => {
+                const parts = (obs.obs_number || '').split('-');
+                const secNum = parts[0] || '0';
+                const secName = obs.section_name || obs.system || 'Unknown';
+                const key = secNum + '::' + secName;
+                if (!sectionGroups[key]) {
+                    sectionGroups[key] = { secNum, secName, obs: [] };
+                }
+                sectionGroups[key].obs.push(obs);
+            });
+
+            // Organize into categories
+            const categories = { A: [], B: [], C: [] };
+            Object.entries(sectionGroups).forEach(([key, group]) => {
+                const cat = sectionToCategory(group.secName);
+                categories[cat].push({ ...group, sectionKey: key });
+            });
+
+            // Sort sections by number within each category
+            for (const cat of ['A', 'B', 'C']) {
+                categories[cat].sort((a, b) => parseInt(a.secNum) - parseInt(b.secNum));
+            }
+
+            // Build flat row array
+            const rows = [];
+            const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+
+            for (const cat of ['A', 'B', 'C']) {
+                if (categories[cat].length === 0) continue;
+
+                rows.push({ type: 'category', key: 'cat-' + cat, label: CATEGORY_LABELS[cat] });
+
+                for (const section of categories[cat]) {
+                    // Compute bucket subtotals
+                    const buckets = { 'curr': 0, '1-3': 0, '4-6': 0, '7-9': 0, '10-12': 0, '13-15': 0 };
+                    section.obs.forEach(obs => {
+                        const b = priorityToBucket(obs.priority);
+                        if (b !== 'info' && obs.cost_high > 0) {
+                            buckets[b] += obs.cost_high;
+                        }
+                    });
+
+                    rows.push({
+                        type: 'system',
+                        key: 'sys-' + section.sectionKey,
+                        sectionKey: section.sectionKey,
+                        label: section.secNum + '. ' + section.secName,
+                        obsCount: section.obs.length,
+                        buckets,
+                    });
+
+                    // Sort obs by sub-number
+                    const sorted = [...section.obs].sort((a, b) => {
+                        const aSub = parseInt((a.obs_number || '').split('-')[1]) || 0;
+                        const bSub = parseInt((b.obs_number || '').split('-')[1]) || 0;
+                        return aSub - bSub;
+                    });
+
+                    sorted.forEach((obs, i) => {
+                        const bucket = priorityToBucket(obs.priority);
+                        const recType = getRecType(obs);
+                        const cost = obs.cost_high > 0 ? obs.cost_high : 0;
+                        const label = (obs.recommendation || obs.caption || obs.component || 'Observation').substring(0, 60);
+
+                        rows.push({
+                            type: 'obs',
+                            key: 'obs-' + obs.obs_number,
+                            sectionKey: section.sectionKey,
+                            letter: LETTERS[i] || String(i + 1),
+                            label,
+                            obs,
+                            bucket,
+                            recType,
+                            cost,
+                        });
+                    });
+                }
+            }
+            return rows;
+        },
+
+        grandTotal(bucket) {
+            let sum = 0;
+            this.observations.forEach(obs => {
+                const b = priorityToBucket(obs.priority);
+                if (b === bucket && obs.cost_high > 0) {
+                    sum += obs.cost_high;
+                }
+            });
+            return sum;
+        },
+
+        hasImage(obs) {
+            return imageMap[obs.obs_number] || false;
+        },
+
+        hasFlags(obs) {
+            return obs.flags && obs.flags.length > 0;
+        },
+
+        conditionBadge(condition) {
+            const c = (condition || '').toLowerCase();
+            if (c === 'critical') return 'badge-critical';
+            if (c === 'poor') return 'badge-poor';
+            if (c === 'fair') return 'badge-fair';
+            if (c === 'good') return 'badge-good';
+            if (c === 'satisfactory') return 'badge-satisfactory';
+            return 'bg-gray-100 text-gray-600';
+        },
+
+        selectObs(obs) {
+            // Skip if already viewing the same observation
+            if (this.panelOpen && this.selectedObs?.obs_number === obs.obs_number) return;
+            // Save current if dirty before switching
+            if (this.dirty && this.selectedObs) {
+                this.saveChanges();
+            }
+            this.selectedObs = obs;
+            this.editFields = {
+                caption: obs.caption || '',
+                system: obs.system || '',
+                component: obs.component || '',
+                location: obs.location || '',
+                condition: obs.condition || '',
+                priority: obs.priority || '',
+                cost_low: obs.cost_low || 0,
+                cost_high: obs.cost_high || 0,
+                prose: obs.prose || '',
+                recommendation: obs.recommendation || '',
+            };
+            this.dirty = false;
+            this.saveSuccess = false;
+            this.panelOpen = true;
+        },
+
+        closePanel() {
+            if (this.dirty && this.selectedObs) {
+                this.saveChanges();
+            }
+            this.panelOpen = false;
+        },
+
+        markDirty() {
+            this.dirty = true;
+            this.saveSuccess = false;
+        },
+
+        async patchField(fields) {
+            if (!this.selectedObs) return;
+            try {
+                await fetch(`/observation/{{ job.id }}/${this.selectedObs.obs_number}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fields),
+                });
+            } catch (err) {
+                console.error('Patch failed:', err);
+            }
+        },
+
+        async toggleFlagsReviewed() {
+            const newVal = !this.selectedObs.flags_reviewed;
+            this.selectedObs.flags_reviewed = newVal;
+            await this.patchField({ flags_reviewed: newVal });
+        },
+
+        async toggleApproval() {
+            const newVal = !this.selectedObs.approved;
+            this.selectedObs.approved = newVal;
+            await this.patchField({ approved: newVal });
+        },
+
+        async saveChanges() {
+            if (!this.selectedObs) return;
+            this.saving = true;
+
+            try {
+                const resp = await fetch(`/observation/{{ job.id }}/${this.selectedObs.obs_number}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.editFields),
+                });
+
+                if (resp.ok) {
+                    // Update local data
+                    Object.assign(this.selectedObs, this.editFields);
+                    this.dirty = false;
+                    this.saveSuccess = true;
+                    setTimeout(() => this.saveSuccess = false, 3000);
+                }
+            } catch (err) {
+                console.error('Save failed:', err);
+            }
+            this.saving = false;
+        },
+    };
+}
+
+async function generateReport(format) {
+    const btn = event.target;
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch(`/report/{{ job.id }}/${format}`, { method: 'POST' });
+        if (resp.ok) {
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RAND_Report.${format}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } else {
+            alert('Report generation failed');
+        }
+    } catch (err) {
+        alert('Error generating report');
+    }
+
+    btn.textContent = format === 'pptx' ? 'Download PPTX Report' : 'Download PDF Report';
+    btn.disabled = false;
+}
+</script>
+{% endblock %}
