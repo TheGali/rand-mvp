@@ -2,12 +2,11 @@
 
 Structure:
   1. Cover page (building name, address, date)
-  2. Command center table
+  2. Funding summary (expanded view with categories/systems/observations)
   3. Observation pages (photo + prose + recommendation)
-  4. Funding summary appendix
+  4. Engineer sign-off appendix
 """
 
-from collections import defaultdict
 from pathlib import Path
 
 from fpdf import FPDF
@@ -129,76 +128,6 @@ def _add_cover(pdf, job):
     pdf.cell(0, 8, "RAND Engineering & Architecture, DPC", align="C", new_x="LMARGIN", new_y="NEXT")
 
 
-def _add_command_center(pdf, observations):
-    """Command center table page(s)."""
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_text_color(*NAVY)
-    pdf.cell(0, 10, "Command Center", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(3)
-
-    # Table header
-    col_widths = [14, 35, 30, 22, 22, 55, 18]
-    headers = ["Obs #", "System", "Component", "Cond.", "Priority", "Summary", "Cost"]
-
-    pdf.set_font("Helvetica", "B", 7)
-    pdf.set_fill_color(*NAVY)
-    pdf.set_text_color(*WHITE)
-
-    for i, (header, w) in enumerate(zip(headers, col_widths)):
-        pdf.cell(w, 7, header, border=1, fill=True, align="C")
-    pdf.ln()
-
-    # Data rows
-    pdf.set_font("Helvetica", "", 7)
-    for idx, obs in enumerate(observations):
-        # Check if we need a new page
-        if pdf.get_y() > 245:
-            pdf.add_page()
-            # Re-draw header
-            pdf.set_font("Helvetica", "B", 16)
-            pdf.set_text_color(*NAVY)
-            pdf.cell(0, 10, "Command Center (continued)", new_x="LMARGIN", new_y="NEXT")
-            pdf.ln(3)
-            pdf.set_font("Helvetica", "B", 7)
-            pdf.set_fill_color(*NAVY)
-            pdf.set_text_color(*WHITE)
-            for header, w in zip(headers, col_widths):
-                pdf.cell(w, 7, header, border=1, fill=True, align="C")
-            pdf.ln()
-            pdf.set_font("Helvetica", "", 7)
-
-        # Alternating row color
-        if idx % 2 == 0:
-            pdf.set_fill_color(*LIGHT_BG)
-            fill = True
-        else:
-            pdf.set_fill_color(*WHITE)
-            fill = True
-
-        pdf.set_text_color(*DARK)
-
-        cost_high = obs.get("cost_high", 0)
-        cost_str = f"${cost_high:,.0f}" if cost_high > 0 else ""
-
-        prose_summary = obs.get("prose", "")
-        if len(prose_summary) > 45:
-            prose_summary = prose_summary[:45] + "..."
-
-        values = [
-            obs.get("obs_number", ""),
-            obs.get("system", "")[:22],
-            obs.get("component", "")[:20],
-            obs.get("condition", ""),
-            obs.get("priority", "")[:12],
-            prose_summary,
-            cost_str,
-        ]
-
-        for val, w in zip(values, col_widths):
-            pdf.cell(w, 6, str(val), border=1, fill=fill)
-        pdf.ln()
-
 
 def _add_observation_pages(pdf, observations, job_dir):
     """One page per observation with photo, prose, and details."""
@@ -287,100 +216,197 @@ def _add_observation_pages(pdf, observations, job_dir):
                 pdf.cell(0, 4, f"  {flag.get('type', '')}: {flag.get('message', '')}", new_x="LMARGIN", new_y="NEXT")
 
 
+def _priority_to_bucket(priority):
+    """Map a priority string to a funding bucket key."""
+    p = (priority or "").lower().strip()
+    if p in ("immediate", "year 1"):
+        return "curr"
+    if p in ("year 1-2", "year 1-3", "year 2-3"):
+        return "1-3"
+    if p in ("year 2-4", "year 3-5", "year 1-5", "year 4-5"):
+        return "4-6"
+    if p in ("year 6-10", "year 5-10"):
+        return "7-9"
+    if p in ("year 10+", "year 10-15"):
+        return "10-12"
+    if p == "capital planning":
+        return "13-15"
+    return "info"
+
+
+def _section_to_category(section_name):
+    """Map a section/system name to category A, B, or C."""
+    s = (section_name or "").lower()
+    cat_a = ["roof", "exterior walls", "facade", "windows", "interior finishes",
+             "interior", "site", "grounds", "common areas"]
+    cat_b = ["hvac", "electrical", "plumbing", "fire protection",
+             "elevators", "elevator", "structure", "structural", "foundation"]
+    for kw in cat_a:
+        if kw in s:
+            return "A"
+    for kw in cat_b:
+        if kw in s:
+            return "B"
+    return "C"
+
+
+BUCKET_COLS = ["curr", "1-3", "4-6", "7-9", "10-12", "13-15"]
+BUCKET_HEADERS = ["Curr. Rec.", "Yrs 1-3", "Yrs 4-6", "Yrs 7-9", "Yrs 10-12", "Yrs 13-15"]
+CATEGORY_LABELS = {
+    "A": "A. Building Exterior and Interiors",
+    "B": "B. Essential Services",
+    "C": "C. Other",
+}
+
+
+def _fmt_cost(amount):
+    """Format a cost amount like the web UI."""
+    if not amount or amount <= 0:
+        return ""
+    if amount >= 1_000_000:
+        return f"${amount / 1_000_000:.1f}M"
+    if amount >= 1_000:
+        return f"${round(amount / 1000)}K"
+    return f"${amount:,.0f}"
+
+
 def _add_funding_summary(pdf, observations):
-    """Funding summary appendix page."""
+    """Funding summary — expanded view matching the web UI."""
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(*NAVY)
     pdf.cell(0, 10, "Funding Summary", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
 
-    # Group costs
-    system_priority_costs = defaultdict(lambda: defaultdict(float))
-    all_priorities = set()
-
+    # Group observations by section number
+    section_groups = {}
     for obs in observations:
-        system = obs.get("system", "Other")
-        priority = obs.get("priority", "Unclassified")
-        cost_high = obs.get("cost_high", 0)
-        all_priorities.add(priority)
-        if cost_high > 0:
-            system_priority_costs[system][priority] += cost_high
+        parts = (obs.get("obs_number", "") or "").split("-")
+        sec_num = parts[0] if parts else "0"
+        sec_name = obs.get("section_name") or obs.get("system") or "Unknown"
+        key = f"{sec_num}::{sec_name}"
+        if key not in section_groups:
+            section_groups[key] = {"sec_num": sec_num, "sec_name": sec_name, "obs": []}
+        section_groups[key]["obs"].append(obs)
 
-    def priority_sort_key(p):
-        pl = p.lower()
-        if "immediate" in pl or "1-2" in pl:
-            return 0
-        if "1-3" in pl or "short" in pl:
-            return 1
-        if "3-5" in pl or "medium" in pl:
-            return 2
-        if "6-10" in pl or "long" in pl:
-            return 3
-        if "10" in pl or "capital" in pl:
-            return 4
-        return 5
+    # Organize into categories
+    categories = {"A": [], "B": [], "C": []}
+    for key, group in section_groups.items():
+        cat = _section_to_category(group["sec_name"])
+        categories[cat].append({**group, "section_key": key})
 
-    sorted_priorities = sorted(all_priorities, key=priority_sort_key)
-    sorted_systems = sorted(system_priority_costs.keys())
+    for cat in ("A", "B", "C"):
+        categories[cat].sort(key=lambda g: int(g["sec_num"]) if g["sec_num"].isdigit() else 0)
 
-    if not sorted_systems:
-        pdf.set_font("Helvetica", "", 10)
-        pdf.set_text_color(*GRAY)
-        pdf.cell(0, 8, "No cost data available.")
-        return
+    # Column widths
+    items_w = 62
+    est_w = 28
+    bucket_w = (pdf.w - 20 - items_w - est_w) / 6
 
-    # Table
-    cols = ["System"] + sorted_priorities + ["Total"]
-    num_cols = len(cols)
-    system_w = 40
-    data_w = (pdf.w - 20 - system_w) / (num_cols - 1)
+    def _draw_table_header():
+        pdf.set_font("Helvetica", "B", 6)
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(*WHITE)
+        pdf.cell(items_w, 8, "Report Items", border=1, fill=True, align="C")
+        pdf.cell(est_w, 8, "Est. Qty / Cost", border=1, fill=True, align="C")
+        for h in BUCKET_HEADERS:
+            pdf.cell(bucket_w, 8, h, border=1, fill=True, align="C")
+        pdf.ln()
 
-    # Header
+    _draw_table_header()
+
+    def _check_page_break():
+        if pdf.get_y() > 240:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.set_text_color(*NAVY)
+            pdf.cell(0, 10, "Funding Summary (continued)", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+            _draw_table_header()
+
+    # Grand totals
+    grand_buckets = {b: 0 for b in BUCKET_COLS}
+    letters = "abcdefghijklmnopqrstuvwxyz"
+
+    for cat in ("A", "B", "C"):
+        if not categories[cat]:
+            continue
+
+        _check_page_break()
+
+        # Category header row
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_fill_color(220, 228, 237)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(items_w + est_w + bucket_w * 6, 7, CATEGORY_LABELS[cat], border=1, fill=True)
+        pdf.ln()
+
+        for section in categories[cat]:
+            _check_page_break()
+
+            # Compute bucket subtotals for this system
+            sys_buckets = {b: 0 for b in BUCKET_COLS}
+            for obs in section["obs"]:
+                b = _priority_to_bucket(obs.get("priority", ""))
+                if b != "info" and obs.get("cost_high", 0) > 0:
+                    sys_buckets[b] += obs["cost_high"]
+
+            # System subtotal row
+            pdf.set_font("Helvetica", "B", 7)
+            pdf.set_fill_color(*LIGHT_BG)
+            pdf.set_text_color(*DARK)
+            label = f"{section['sec_num']}. {section['sec_name']}"
+            if len(label) > 38:
+                label = label[:38] + "..."
+            pdf.cell(items_w, 6, f"  {label} ({len(section['obs'])})", border=1, fill=True)
+            pdf.cell(est_w, 6, "", border=1, fill=True)
+            for b in BUCKET_COLS:
+                pdf.cell(bucket_w, 6, _fmt_cost(sys_buckets[b]), border=1, fill=True, align="R")
+            pdf.ln()
+
+            # Individual observation rows
+            sorted_obs = sorted(section["obs"], key=lambda o: int((o.get("obs_number", "") or "").split("-")[1]) if len((o.get("obs_number", "") or "").split("-")) > 1 and (o.get("obs_number", "") or "").split("-")[1].isdigit() else 0)
+
+            for i, obs in enumerate(sorted_obs):
+                _check_page_break()
+
+                bucket = _priority_to_bucket(obs.get("priority", ""))
+                cost = obs.get("cost_high", 0) if obs.get("cost_high", 0) > 0 else 0
+
+                if bucket != "info" and cost > 0:
+                    grand_buckets[bucket] += cost
+
+                letter = letters[i] if i < len(letters) else str(i + 1)
+                obs_label = (obs.get("recommendation") or obs.get("caption") or obs.get("component") or "Observation")
+                if len(obs_label) > 35:
+                    obs_label = obs_label[:35] + "..."
+
+                pdf.set_font("Helvetica", "", 6)
+                pdf.set_fill_color(*WHITE)
+                pdf.set_text_color(*DARK)
+                pdf.cell(items_w, 5, f"      {letter}. {obs_label}", border=1, fill=True)
+
+                est_info = str(obs.get("estimate_info", "") or "")
+                if len(est_info) > 18:
+                    est_info = est_info[:18] + "..."
+                pdf.set_font("Helvetica", "", 5.5)
+                pdf.cell(est_w, 5, est_info, border=1, fill=True, align="C")
+
+                for b in BUCKET_COLS:
+                    val = _fmt_cost(cost) if b == bucket and bucket != "info" else ""
+                    pdf.cell(bucket_w, 5, val, border=1, fill=True, align="R")
+                pdf.ln()
+
+    # Grand total row
+    _check_page_break()
     pdf.set_font("Helvetica", "B", 7)
     pdf.set_fill_color(*NAVY)
     pdf.set_text_color(*WHITE)
-    pdf.cell(system_w, 7, "System", border=1, fill=True, align="C")
-    for col in cols[1:]:
-        col_display = col[:12] if len(col) > 12 else col
-        pdf.cell(data_w, 7, col_display, border=1, fill=True, align="C")
+    pdf.cell(items_w, 7, "  TOTAL", border=1, fill=True)
+    pdf.cell(est_w, 7, "", border=1, fill=True)
+    for b in BUCKET_COLS:
+        pdf.cell(bucket_w, 7, _fmt_cost(grand_buckets[b]), border=1, fill=True, align="R")
     pdf.ln()
-
-    # Data
-    pdf.set_font("Helvetica", "", 7)
-    for i, system in enumerate(sorted_systems):
-        if i % 2 == 0:
-            pdf.set_fill_color(*LIGHT_BG)
-        else:
-            pdf.set_fill_color(*WHITE)
-
-        pdf.set_text_color(*DARK)
-        sys_display = system[:25] if len(system) > 25 else system
-        pdf.cell(system_w, 6, sys_display, border=1, fill=True)
-
-        row_total = 0
-        for pri in sorted_priorities:
-            cost = system_priority_costs[system].get(pri, 0)
-            pdf.cell(data_w, 6, f"${cost:,.0f}" if cost > 0 else "—", border=1, fill=True, align="R")
-            row_total += cost
-
-        pdf.set_font("Helvetica", "B", 7)
-        pdf.cell(data_w, 6, f"${row_total:,.0f}" if row_total > 0 else "—", border=1, fill=True, align="R")
-        pdf.set_font("Helvetica", "", 7)
-        pdf.ln()
-
-    # Grand total
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(*LIGHT_BG)
-    pdf.cell(system_w, 7, "TOTAL", border=1, fill=True)
-
-    for pri in sorted_priorities:
-        col_total = sum(system_priority_costs[sys].get(pri, 0) for sys in sorted_systems)
-        pdf.cell(data_w, 7, f"${col_total:,.0f}" if col_total > 0 else "—", border=1, fill=True, align="R")
-
-    grand_total = sum(cost for sys_costs in system_priority_costs.values() for cost in sys_costs.values())
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(data_w, 7, f"${grand_total:,.0f}", border=1, fill=True, align="R")
 
 
 def _add_signoff_page(pdf, observations):
@@ -467,16 +493,13 @@ def generate_pdf_report(job, job_dir, output_path):
     # 1. Cover
     _add_cover(pdf, job)
 
-    # 2. Command center
-    _add_command_center(pdf, observations)
+    # 2. Funding summary (expanded view)
+    _add_funding_summary(pdf, observations)
 
     # 3. Observation pages
     _add_observation_pages(pdf, observations, job_dir)
 
-    # 4. Funding summary
-    _add_funding_summary(pdf, observations)
-
-    # 5. Engineer sign-off
+    # 4. Engineer sign-off
     _add_signoff_page(pdf, observations)
 
     # Save
