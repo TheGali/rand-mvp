@@ -109,7 +109,7 @@ def _add_cover(pdf, job):
     pdf.set_y(80)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(*WHITE)
-    pdf.cell(0, 15, job.get("building_name", "Building Survey"), align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(0, 15, job.get("building_name", "Building Survey"), align="C", new_x="LMARGIN", new_y="NEXT")
 
     # Address
     pdf.set_font("Helvetica", "", 16)
