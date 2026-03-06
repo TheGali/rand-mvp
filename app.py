@@ -26,6 +26,7 @@ from fastapi.responses import (
     StreamingResponse,
     FileResponse,
     JSONResponse,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -334,6 +335,20 @@ async def generate_pptx_report(request: Request, job_id: str):
         str(output_path),
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         filename=f"RAND_Report_{job.get('building_name', 'Survey')}.pptx",
+    )
+
+
+@app.get("/template/pptx")
+async def download_template(request: Request):
+    redirect = require_auth(request)
+    if redirect:
+        return redirect
+    from web.pptx_template_writer import generate_template_pptx
+    content = generate_template_pptx()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": "attachment; filename=RAND_Survey_Template.pptx"},
     )
 
 
