@@ -406,6 +406,11 @@
                                 <textarea x-model="editFields.recommendation" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red resize-y" @input="markDirty()"></textarea>
                             </div>
 
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Funding Label <span class="text-gray-400 font-normal">(short name for funding table)</span></label>
+                                <input type="text" x-model="editFields.funding_label" maxlength="50" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red" @input="markDirty()" placeholder="e.g. Replace EPDM roof membrane">
+                            </div>
+
                             <!-- Flags -->
                             <template x-if="selectedObs.flags && selectedObs.flags.length > 0">
                                 <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
@@ -692,7 +697,7 @@ function dashboardApp() {
                         const bucket = priorityToBucket(obs.priority);
                         const recType = getRecType(obs);
                         const cost = obs.cost_high > 0 ? obs.cost_high : 0;
-                        const label = (obs.recommendation || obs.caption || obs.component || 'Observation').substring(0, 60);
+                        const label = (obs.funding_label || obs.recommendation || obs.caption || obs.component || 'Observation').substring(0, 60);
 
                         rows.push({
                             type: 'obs',
@@ -760,6 +765,7 @@ function dashboardApp() {
                 cost_high: obs.cost_high || 0,
                 prose: obs.prose || '',
                 recommendation: obs.recommendation || '',
+                funding_label: obs.funding_label || '',
             };
             this.dirty = false;
             this.saveSuccess = false;

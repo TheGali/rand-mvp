@@ -122,6 +122,7 @@ def _process_single_observation(client, obs, model_name, max_dim, max_retries):
                         condition=data.get("condition", ""),
                         prose=data.get("prose", ""),
                         recommendation=data.get("recommendation", ""),
+                        funding_label=data.get("funding_label", ""),
                         priority=data.get("priority", ""),
                         cost_low=float(data.get("cost_low", 0)),
                         cost_high=float(data.get("cost_high", 0)),

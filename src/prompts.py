@@ -123,6 +123,10 @@ OBSERVATION_TOOL_SCHEMA = {
                 "type": "string",
                 "description": "Summary of recommended action"
             },
+            "funding_label": {
+                "type": "string",
+                "description": "Short label for funding summary table (max 50 chars) — concise action phrase, e.g. 'Replace EPDM roof membrane' or 'Repair facade cracks at floors 8-10'"
+            },
             "priority": {
                 "type": "string",
                 "description": "Priority timeframe (e.g., Year 1-2, Year 3-5, Year 6-10, Immediate, Short Term)"
@@ -156,7 +160,7 @@ OBSERVATION_TOOL_SCHEMA = {
         },
         "required": [
             "caption", "system", "component", "location", "condition",
-            "prose", "recommendation", "priority", "cost_low", "cost_high", "flags"
+            "prose", "recommendation", "funding_label", "priority", "cost_low", "cost_high", "flags"
         ]
     }
 }

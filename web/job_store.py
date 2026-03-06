@@ -70,7 +70,7 @@ def update_observation(job_id: str, obs_number: str, updates: dict) -> bool:
             # Only update allowed editable fields
             editable = {
                 "caption", "system", "component", "location", "condition",
-                "prose", "recommendation", "priority", "cost_low", "cost_high",
+                "prose", "recommendation", "funding_label", "priority", "cost_low", "cost_high",
                 "approved", "approved_by", "approved_at",
                 "flags_reviewed", "estimate_info",
             }

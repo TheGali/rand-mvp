@@ -377,9 +377,9 @@ def _add_funding_summary(pdf, observations):
                     grand_buckets[bucket] += cost
 
                 letter = letters[i] if i < len(letters) else str(i + 1)
-                obs_label = (obs.get("recommendation") or obs.get("caption") or obs.get("component") or "Observation")
-                if len(obs_label) > 35:
-                    obs_label = obs_label[:35] + "..."
+                obs_label = (obs.get("funding_label") or obs.get("recommendation") or obs.get("caption") or obs.get("component") or "Observation")
+                if len(obs_label) > 50:
+                    obs_label = obs_label[:50] + "..."
 
                 pdf.set_font("Helvetica", "", 6)
                 pdf.set_fill_color(*WHITE)

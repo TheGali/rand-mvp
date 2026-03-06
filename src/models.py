@@ -35,6 +35,7 @@ class ProcessedObservation:
     condition: str = ""
     prose: str = ""
     recommendation: str = ""
+    funding_label: str = ""
     priority: str = ""
     cost_low: float = 0.0
     cost_high: float = 0.0
