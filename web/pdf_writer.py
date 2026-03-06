@@ -86,7 +86,8 @@ class RANDReport(FPDF):
         self.cell(0, 5, "RAND Engineering & Architecture, DPC", align="L")
         self.cell(0, 5, self.job.get("building_name", ""), align="R", new_x="LMARGIN", new_y="NEXT")
         self.set_draw_color(*NAVY)
-        self.line(10, 12, self.w - 10, 12)
+        line_y = self.get_y() + 1
+        self.line(10, line_y, self.w - 10, line_y)
         self.ln(4)
 
     def footer(self):
