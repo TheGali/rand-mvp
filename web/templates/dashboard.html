@@ -430,6 +430,12 @@
                                 </div>
                             </template>
 
+                            <!-- Warning: editing approved observation -->
+                            <div x-show="selectedObs.approved && dirty" class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                <span class="shrink-0 mt-0.5">&#9888;</span>
+                                <span>Saving will remove the approval by <strong x-text="selectedObs.approved_by"></strong>. This observation will need to be re-approved.</span>
+                            </div>
+
                             <!-- Save + Approve buttons -->
                             <div class="flex items-center gap-3 pt-2">
                                 <button
@@ -847,16 +853,21 @@ function dashboardApp() {
             if (!this.selectedObs) return;
             this.saving = true;
 
+            const wasApproved = this.selectedObs.approved;
+            const payload = wasApproved
+                ? { ...this.editFields, approved: false, approved_by: '', approved_at: '' }
+                : this.editFields;
+
             try {
                 const resp = await fetch(`/observation/{{ job.id }}/${this.selectedObs.obs_number}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.editFields),
+                    body: JSON.stringify(payload),
                 });
 
                 if (resp.ok) {
                     // Update local data
-                    Object.assign(this.selectedObs, this.editFields);
+                    Object.assign(this.selectedObs, payload);
                     this.dirty = false;
                     this.saveSuccess = true;
                     setTimeout(() => this.saveSuccess = false, 3000);
