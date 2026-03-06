@@ -220,9 +220,11 @@
 
                                 <!-- Observation row -->
                                 <template x-if="row.type === 'obs'">
-                                    <td class="pl-12">
+                                    <td class="pl-12" @click.stop>
                                         <span class="text-gray-400 mr-1" x-text="row.letter + '.'"></span>
-                                        <span x-text="row.label"></span>
+                                        <input type="text" class="w-full border-0 bg-transparent text-xs focus:bg-white focus:border focus:border-gray-300 focus:ring-1 focus:ring-rand-red rounded px-1 py-0.5"
+                                            x-model="row.obs.recommendation"
+                                            @change="patchFundingField(row.obs, 'recommendation', row.obs.recommendation)">
                                     </td>
                                 </template>
                                 <template x-if="row.type === 'obs'">
