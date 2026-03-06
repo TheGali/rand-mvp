@@ -504,13 +504,7 @@ function dashboardApp() {
         if (o.approved_by === undefined) o.approved_by = '';
         if (o.approved_at === undefined) o.approved_at = '';
         if (o.flags_reviewed === undefined) o.flags_reviewed = false;
-        // Auto-populate estimate_info once if never set
-        if (o.estimate_info === undefined) {
-            const rt = getRecType(o);
-            o.estimate_info = rt === 'Current' ? 'Current Recommendation'
-                : rt === 'Future' ? 'Future Allowance'
-                : 'Informational Item Only';
-        }
+        if (o.estimate_info === undefined) o.estimate_info = '';
     });
 
     // ── Category mapping for Appendix A ──
