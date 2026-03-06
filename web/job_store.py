@@ -71,7 +71,7 @@ def update_observation(job_id: str, obs_number: str, updates: dict) -> bool:
             editable = {
                 "caption", "system", "component", "location", "condition",
                 "prose", "recommendation", "priority", "cost_low", "cost_high",
-                "approved", "flags_reviewed",
+                "approved", "flags_reviewed", "estimate_info",
             }
             for key, value in updates.items():
                 if key in editable:
