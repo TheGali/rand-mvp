@@ -410,9 +410,8 @@ def _add_funding_summary(pdf, observations):
 
 
 def _add_signoff_page(pdf, observations):
-    """Engineer sign-off appendix page listing all approved observations."""
-    approved = [o for o in observations if o.get("approved")]
-    if not approved:
+    """Engineer sign-off appendix page listing all observations with approval status."""
+    if not observations:
         return
 
     pdf.add_page()
@@ -422,7 +421,7 @@ def _add_signoff_page(pdf, observations):
 
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(*GRAY)
-    pdf.cell(0, 6, "Each observation below has been reviewed and approved by the signing engineer.",
+    pdf.cell(0, 6, "Observations marked below have been reviewed and approved by the signing engineer.",
              new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
 
@@ -437,7 +436,7 @@ def _add_signoff_page(pdf, observations):
     pdf.ln()
 
     pdf.set_font("Helvetica", "", 7)
-    for idx, obs in enumerate(approved):
+    for idx, obs in enumerate(observations):
         if pdf.get_y() > 245:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 16)
@@ -459,17 +458,21 @@ def _add_signoff_page(pdf, observations):
 
         pdf.set_text_color(*DARK)
 
-        approved_at = obs.get("approved_at", "")
-        if approved_at:
-            try:
-                approved_at = approved_at[:10]
-            except Exception:
-                pass
+        approved_by = ""
+        approved_at = ""
+        if obs.get("approved"):
+            approved_by = obs.get("approved_by", "")[:35]
+            approved_at = obs.get("approved_at", "")
+            if approved_at:
+                try:
+                    approved_at = approved_at[:10]
+                except Exception:
+                    pass
 
         values = [
             obs.get("obs_number", ""),
             obs.get("system", "")[:35],
-            obs.get("approved_by", "")[:35],
+            approved_by,
             approved_at,
         ]
 

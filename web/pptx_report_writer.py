@@ -435,9 +435,8 @@ def _add_funding_summary_slide(prs, observations):
 
 
 def _add_signoff_slide(prs, observations):
-    """Add engineer sign-off appendix slide listing all approved observations."""
-    approved = [o for o in observations if o.get("approved")]
-    if not approved:
+    """Add engineer sign-off appendix slide listing all observations with approval status."""
+    if not observations:
         return None
 
     slide_layout = prs.slide_layouts[6]  # Blank
@@ -450,12 +449,12 @@ def _add_signoff_slide(prs, observations):
 
     _add_text_box(
         slide, Inches(0.5), Inches(0.85), Inches(11), Inches(0.4),
-        "Each observation below has been reviewed and approved by the signing engineer.",
+        "Observations marked below have been reviewed and approved by the signing engineer.",
         font_size=10, italic=True, color=GRAY,
     )
 
     cols = 4
-    rows = len(approved) + 1
+    rows = len(observations) + 1
     table_shape = slide.shapes.add_table(
         rows, cols, Inches(0.5), Inches(1.4), Inches(12.3), Inches(0.35) * rows
     )
@@ -476,19 +475,23 @@ def _add_signoff_slide(prs, observations):
         cell.fill.solid()
         cell.fill.fore_color.rgb = NAVY
 
-    for i, obs in enumerate(approved):
+    for i, obs in enumerate(observations):
         row_idx = i + 1
-        approved_at = obs.get("approved_at", "")
-        if approved_at:
-            try:
-                approved_at = approved_at[:10]  # ISO date part
-            except Exception:
-                pass
+        approved_by = ""
+        approved_at = ""
+        if obs.get("approved"):
+            approved_by = obs.get("approved_by", "")
+            approved_at = obs.get("approved_at", "")
+            if approved_at:
+                try:
+                    approved_at = approved_at[:10]  # ISO date part
+                except Exception:
+                    pass
 
         values = [
             obs.get("obs_number", ""),
             obs.get("system", ""),
-            obs.get("approved_by", ""),
+            approved_by,
             approved_at,
         ]
 
