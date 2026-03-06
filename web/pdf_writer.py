@@ -382,6 +382,75 @@ def _add_funding_summary(pdf, observations):
     pdf.cell(data_w, 7, f"${grand_total:,.0f}", border=1, fill=True, align="R")
 
 
+def _add_signoff_page(pdf, observations):
+    """Engineer sign-off appendix page listing all approved observations."""
+    approved = [o for o in observations if o.get("approved")]
+    if not approved:
+        return
+
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(0, 10, "Engineer Sign-Off", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 6, "Each observation below has been reviewed and approved by the signing engineer.",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(3)
+
+    col_widths = [18, 55, 55, 68]
+    headers = ["Obs #", "System", "Approved By", "Date"]
+
+    pdf.set_font("Helvetica", "B", 7)
+    pdf.set_fill_color(*NAVY)
+    pdf.set_text_color(*WHITE)
+    for header, w in zip(headers, col_widths):
+        pdf.cell(w, 7, header, border=1, fill=True, align="C")
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 7)
+    for idx, obs in enumerate(approved):
+        if pdf.get_y() > 245:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.set_text_color(*NAVY)
+            pdf.cell(0, 10, "Engineer Sign-Off (continued)", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+            pdf.set_font("Helvetica", "B", 7)
+            pdf.set_fill_color(*NAVY)
+            pdf.set_text_color(*WHITE)
+            for header, w in zip(headers, col_widths):
+                pdf.cell(w, 7, header, border=1, fill=True, align="C")
+            pdf.ln()
+            pdf.set_font("Helvetica", "", 7)
+
+        if idx % 2 == 0:
+            pdf.set_fill_color(*LIGHT_BG)
+        else:
+            pdf.set_fill_color(*WHITE)
+
+        pdf.set_text_color(*DARK)
+
+        approved_at = obs.get("approved_at", "")
+        if approved_at:
+            try:
+                approved_at = approved_at[:10]
+            except Exception:
+                pass
+
+        values = [
+            obs.get("obs_number", ""),
+            obs.get("system", "")[:35],
+            obs.get("approved_by", "")[:35],
+            approved_at,
+        ]
+
+        for val, w in zip(values, col_widths):
+            pdf.cell(w, 6, str(val), border=1, fill=True)
+        pdf.ln()
+
+
 def generate_pdf_report(job, job_dir, output_path):
     """Generate the polished PDF report.
 
@@ -405,6 +474,9 @@ def generate_pdf_report(job, job_dir, output_path):
 
     # 4. Funding summary
     _add_funding_summary(pdf, observations)
+
+    # 5. Engineer sign-off
+    _add_signoff_page(pdf, observations)
 
     # Save
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

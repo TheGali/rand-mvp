@@ -434,6 +434,78 @@ def _add_funding_summary_slide(prs, observations):
     return slide
 
 
+def _add_signoff_slide(prs, observations):
+    """Add engineer sign-off appendix slide listing all approved observations."""
+    approved = [o for o in observations if o.get("approved")]
+    if not approved:
+        return None
+
+    slide_layout = prs.slide_layouts[6]  # Blank
+    slide = prs.slides.add_slide(slide_layout)
+
+    _add_text_box(
+        slide, Inches(0.5), Inches(0.3), Inches(8), Inches(0.5),
+        "Engineer Sign-Off", font_size=20, bold=True, color=NAVY,
+    )
+
+    _add_text_box(
+        slide, Inches(0.5), Inches(0.85), Inches(11), Inches(0.4),
+        "Each observation below has been reviewed and approved by the signing engineer.",
+        font_size=10, italic=True, color=GRAY,
+    )
+
+    cols = 4
+    rows = len(approved) + 1
+    table_shape = slide.shapes.add_table(
+        rows, cols, Inches(0.5), Inches(1.4), Inches(12.3), Inches(0.35) * rows
+    )
+    table = table_shape.table
+
+    col_widths = [Inches(1.2), Inches(4.0), Inches(3.5), Inches(3.6)]
+    for i, w in enumerate(col_widths):
+        table.columns[i].width = w
+
+    headers = ["Obs #", "System", "Approved By", "Date"]
+    for j, header in enumerate(headers):
+        cell = table.cell(0, j)
+        cell.text = header
+        for p in cell.text_frame.paragraphs:
+            p.font.size = Pt(9)
+            p.font.bold = True
+            p.font.color.rgb = WHITE
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+
+    for i, obs in enumerate(approved):
+        row_idx = i + 1
+        approved_at = obs.get("approved_at", "")
+        if approved_at:
+            try:
+                approved_at = approved_at[:10]  # ISO date part
+            except Exception:
+                pass
+
+        values = [
+            obs.get("obs_number", ""),
+            obs.get("system", ""),
+            obs.get("approved_by", ""),
+            approved_at,
+        ]
+
+        for j, val in enumerate(values):
+            cell = table.cell(row_idx, j)
+            cell.text = str(val)
+            for p in cell.text_frame.paragraphs:
+                p.font.size = Pt(9)
+                p.font.color.rgb = DARK
+
+            if row_idx % 2 == 0:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = LIGHT_BG
+
+    return slide
+
+
 def generate_pptx_report(job, job_dir, output_path):
     """Generate the polished PPTX report.
 
@@ -477,6 +549,9 @@ def generate_pptx_report(job, job_dir, output_path):
 
     # 4. Funding summary
     _add_funding_summary_slide(prs, observations)
+
+    # 5. Engineer sign-off
+    _add_signoff_slide(prs, observations)
 
     # Save
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

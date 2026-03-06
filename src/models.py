@@ -39,6 +39,9 @@ class ProcessedObservation:
     cost_low: float = 0.0
     cost_high: float = 0.0
     flags: list = field(default_factory=list)  # list of dicts, e.g. {"type": "...", "message": "..."}
+    approved: bool = False
+    approved_by: str = ""
+    approved_at: str = ""
 
 
 @dataclass

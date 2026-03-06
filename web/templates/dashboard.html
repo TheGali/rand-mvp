@@ -290,7 +290,10 @@
                 <div class="flex items-center gap-3">
                     <span class="font-semibold text-gray-900 text-sm" x-text="'Observation ' + (selectedObs?.obs_number || '')"></span>
                     <template x-if="selectedObs?.approved">
-                        <span class="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Approved</span>
+                        <span class="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full"
+                            x-text="selectedObs.approved_by
+                                ? 'Approved by ' + selectedObs.approved_by + ' \u00b7 ' + new Date(selectedObs.approved_at).toLocaleDateString()
+                                : 'Approved'"></span>
                     </template>
                 </div>
                 <button class="slideover-close" @click="closePanel()" title="Close (Esc)">
@@ -450,6 +453,38 @@
         </div>
 
     </div>
+
+    <!-- Approval sign-off modal -->
+    <template x-if="showApprovalModal">
+        <div class="fixed inset-0 z-[100] flex items-center justify-center">
+            <div class="absolute inset-0 bg-black/50" @click="showApprovalModal = false"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" @keydown.enter.prevent="confirmApproval()" @keydown.escape.prevent="showApprovalModal = false">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Engineer Sign-Off</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    I confirm that I have reviewed this observation and the AI-generated content accurately reflects the field conditions observed.
+                </p>
+                <div class="mb-5">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Your Name</label>
+                    <input
+                        id="approval-name-input"
+                        type="text"
+                        x-model="approvalName"
+                        placeholder="e.g. John Smith, PE"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                </div>
+                <div class="flex items-center justify-end gap-3">
+                    <button @click="showApprovalModal = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition">Cancel</button>
+                    <button
+                        @click="confirmApproval()"
+                        :disabled="!approvalName.trim()"
+                        class="bg-green-600 text-white font-medium rounded-lg px-5 py-2 text-sm hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >Sign &amp; Approve</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
 </div>
 
 <script>
@@ -466,6 +501,8 @@ function dashboardApp() {
     // Ensure boolean fields exist on every observation
     observations.forEach(o => {
         if (o.approved === undefined) o.approved = false;
+        if (o.approved_by === undefined) o.approved_by = '';
+        if (o.approved_at === undefined) o.approved_at = '';
         if (o.flags_reviewed === undefined) o.flags_reviewed = false;
         // Auto-populate estimate_info once if never set
         if (o.estimate_info === undefined) {
@@ -531,6 +568,8 @@ function dashboardApp() {
         panelOpen: false,
         view: 'funding',
         expandedSystems: {},
+        showApprovalModal: false,
+        approvalName: '',
 
         get systems() {
             return [...new Set(this.observations.map(o => o.system || o.section_name).filter(Boolean))].sort();
@@ -765,9 +804,31 @@ function dashboardApp() {
         },
 
         async toggleApproval() {
-            const newVal = !this.selectedObs.approved;
-            this.selectedObs.approved = newVal;
-            await this.patchField({ approved: newVal });
+            if (this.selectedObs.approved) {
+                // Un-approve immediately (no modal)
+                this.selectedObs.approved = false;
+                this.selectedObs.approved_by = '';
+                this.selectedObs.approved_at = '';
+                await this.patchField({ approved: false, approved_by: '', approved_at: '' });
+            } else {
+                // Open modal — name field always starts blank
+                this.approvalName = '';
+                this.showApprovalModal = true;
+                this.$nextTick(() => {
+                    const input = document.getElementById('approval-name-input');
+                    if (input) input.focus();
+                });
+            }
+        },
+
+        async confirmApproval() {
+            if (!this.approvalName.trim()) return;
+            const now = new Date().toISOString();
+            this.selectedObs.approved = true;
+            this.selectedObs.approved_by = this.approvalName.trim();
+            this.selectedObs.approved_at = now;
+            this.showApprovalModal = false;
+            await this.patchField({ approved: true, approved_by: this.approvalName.trim(), approved_at: now });
         },
 
         async patchFundingField(obs, field, value) {
