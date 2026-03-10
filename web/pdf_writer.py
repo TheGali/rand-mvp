@@ -124,7 +124,7 @@ def _add_cover(pdf, job):
     # Draft watermark if any observation is unapproved
     observations = job.get("processed_observations", [])
     total = len(observations)
-    approved = sum(1 for o in observations if o.get("approved"))
+    approved = sum(1 for o in observations if o.get("approved") and o.get("approved_by"))
     if total > 0 and approved < total:
         # Large diagonal "DRAFT" watermark (semi-transparent white)
         with pdf.local_context(fill_opacity=0.15):
@@ -479,7 +479,7 @@ def _add_signoff_page(pdf, observations):
 
         approved_by = ""
         approved_at = ""
-        if obs.get("approved"):
+        if obs.get("approved") and obs.get("approved_by"):
             approved_by = obs.get("approved_by", "")[:35]
             approved_at = obs.get("approved_at", "")
             if approved_at:

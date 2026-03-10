@@ -630,6 +630,11 @@ function dashboardApp() {
         if (o.approved_at === undefined) o.approved_at = '';
         if (o.flags_reviewed === undefined) o.flags_reviewed = false;
         if (o.estimate_info === undefined) o.estimate_info = '';
+        // Clear ghost approvals (approved=true but no signer name)
+        if (o.approved && !o.approved_by) {
+            o.approved = false;
+            o.approved_at = '';
+        }
     });
 
     // ── Category mapping for Appendix A ──
@@ -711,7 +716,7 @@ function dashboardApp() {
         },
 
         get approvedCount() {
-            return this.observations.filter(o => o.approved).length;
+            return this.observations.filter(o => o.approved && o.approved_by).length;
         },
 
         get unapprovedCount() {

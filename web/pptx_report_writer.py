@@ -111,7 +111,7 @@ def _add_cover_slide(prs, job):
     # Draft watermark if any observation is unapproved
     observations = job.get("processed_observations", [])
     total = len(observations)
-    approved = sum(1 for o in observations if o.get("approved"))
+    approved = sum(1 for o in observations if o.get("approved") and o.get("approved_by"))
     if total > 0 and approved < total:
         # Large diagonal "DRAFT" watermark with semi-transparency
         wm = slide.shapes.add_textbox(Inches(1.5), Inches(1), Inches(10), Inches(5.5))
@@ -509,7 +509,7 @@ def _add_signoff_slide(prs, observations):
         row_idx = i + 1
         approved_by = ""
         approved_at = ""
-        if obs.get("approved"):
+        if obs.get("approved") and obs.get("approved_by"):
             approved_by = obs.get("approved_by", "")
             approved_at = obs.get("approved_at", "")
             if approved_at:
