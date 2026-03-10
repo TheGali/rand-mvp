@@ -41,6 +41,12 @@
     <div class="tab-bar bg-white px-4 shrink-0">
         <button class="tab-btn" :class="view === 'funding' && 'tab-btn-active'" @click="view = 'funding'">Funding Summary</button>
         <button class="tab-btn" :class="view === 'table' && 'tab-btn-active'" @click="view = 'table'">Observations</button>
+        <button class="tab-btn" :class="view === 'chat' && 'tab-btn-active'" @click="view = 'chat'">
+            <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/></svg>
+                AI Assistant
+            </span>
+        </button>
     </div>
 
     <!-- Main content area -->
@@ -265,6 +271,97 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- AI Chat Assistant -->
+        <div x-show="view === 'chat'" class="absolute inset-0 flex flex-col bg-gray-50">
+
+            <!-- Messages area -->
+            <div class="flex-1 panel-scroll p-4 space-y-4" x-ref="chatScroll">
+
+                <!-- Welcome (empty state) -->
+                <template x-if="chatMessages.length === 0 && !chatStreaming">
+                    <div class="max-w-2xl mx-auto text-center py-16">
+                        <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-6 h-6 text-rand-red" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/></svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">RAND AI Assistant</h3>
+                        <p class="text-gray-500 text-sm mb-8">Ask anything about your building's Physical Condition Survey</p>
+                        <div class="flex flex-wrap justify-center gap-2">
+                            <button @click="sendSuggested('What are the most urgent items I should address first?')" class="chat-suggestion">What's most urgent?</button>
+                            <button @click="sendSuggested('Show me a capital spending breakdown by time period')" class="chat-suggestion">Capital spending timeline</button>
+                            <button @click="sendSuggested('Which items are safety or compliance concerns?')" class="chat-suggestion">Safety & compliance</button>
+                            <button @click="sendSuggested('Summarize this report in 3 bullet points for my next board meeting')" class="chat-suggestion">Board meeting summary</button>
+                            <button @click="sendSuggested('What is the total cost if we only do the critical and immediate items?')" class="chat-suggestion">Immediate costs only</button>
+                            <button @click="sendSuggested('Which projects could be bundled together to save money?')" class="chat-suggestion">Bundle opportunities</button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Message list -->
+                <template x-for="(msg, idx) in chatMessages" :key="idx">
+                    <div>
+                        <!-- User message -->
+                        <template x-if="msg.role === 'user'">
+                            <div class="flex justify-end mb-3">
+                                <div class="bg-rand-black text-white rounded-2xl rounded-br-sm px-4 py-2.5 max-w-lg text-sm leading-relaxed" x-text="msg.content"></div>
+                            </div>
+                        </template>
+                        <!-- Assistant message -->
+                        <template x-if="msg.role === 'assistant'">
+                            <div class="flex justify-start mb-3">
+                                <div class="max-w-2xl w-full">
+                                    <template x-for="(block, bi) in msg.blocks" :key="bi">
+                                        <div x-html="renderBlock(block)"></div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Streaming response -->
+                <template x-if="chatStreaming">
+                    <div class="flex justify-start mb-3">
+                        <div class="max-w-2xl w-full">
+                            <template x-for="(block, bi) in streamingBlocks" :key="bi">
+                                <div x-html="renderBlock(block)"></div>
+                            </template>
+                            <div class="flex items-center gap-1.5 mt-2 text-gray-400 text-xs pl-1" x-show="streamingBlocks.length === 0 || streamingBlocks[streamingBlocks.length-1]?.type !== 'text'">
+                                <span class="w-1.5 h-1.5 bg-rand-red rounded-full chat-typing-dot"></span>
+                                <span class="w-1.5 h-1.5 bg-rand-red rounded-full chat-typing-dot"></span>
+                                <span class="w-1.5 h-1.5 bg-rand-red rounded-full chat-typing-dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Input bar -->
+            <div class="shrink-0 border-t bg-white p-3">
+                <div class="max-w-2xl mx-auto flex gap-2">
+                    <input
+                        type="text"
+                        x-model="chatInput"
+                        @keydown.enter.prevent="sendChat()"
+                        :disabled="chatStreaming"
+                        placeholder="Ask about your building report..."
+                        class="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rand-red focus:border-transparent disabled:opacity-50"
+                    >
+                    <button
+                        @click="sendChat()"
+                        :disabled="!chatInput.trim() || chatStreaming"
+                        class="bg-rand-black text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                    </button>
+                </div>
+                <template x-if="chatMessages.length > 0">
+                    <div class="max-w-2xl mx-auto mt-1.5 flex justify-center">
+                        <button @click="chatMessages = []; chatHistory = []; streamingBlocks = [];" class="text-xs text-gray-400 hover:text-gray-600 transition">Clear conversation</button>
+                    </div>
+                </template>
             </div>
         </div>
 
@@ -576,6 +673,14 @@ function dashboardApp() {
         showApprovalModal: false,
         approvalName: '',
 
+        // Chat state
+        chatMessages: [],
+        chatInput: '',
+        chatStreaming: false,
+        streamingBlocks: [],
+        chatHistory: [],
+        _chartCounter: 0,
+
         get systems() {
             return [...new Set(this.observations.map(o => o.system || o.section_name).filter(Boolean))].sort();
         },
@@ -847,6 +952,343 @@ function dashboardApp() {
             } catch (err) {
                 console.error('Funding patch failed:', err);
             }
+        },
+
+        // ── Chat methods ──
+
+        sendSuggested(text) {
+            this.chatInput = text;
+            this.sendChat();
+        },
+
+        async sendChat() {
+            const text = this.chatInput.trim();
+            if (!text || this.chatStreaming) return;
+
+            this.chatInput = '';
+            this.chatStreaming = true;
+            this.streamingBlocks = [];
+
+            this.chatMessages.push({ role: 'user', content: text, blocks: [] });
+
+            this.$nextTick(() => {
+                if (this.$refs.chatScroll) this.$refs.chatScroll.scrollTop = this.$refs.chatScroll.scrollHeight;
+            });
+
+            try {
+                const resp = await fetch(`/chat/{{ job.id }}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, history: this.chatHistory }),
+                });
+
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentTextBlock = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        let data;
+                        try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+                        if (data.type === 'text_delta') {
+                            if (!currentTextBlock || currentTextBlock.type !== 'text') {
+                                currentTextBlock = { type: 'text', content: '' };
+                                this.streamingBlocks.push(currentTextBlock);
+                            }
+                            currentTextBlock.content += data.text;
+                        }
+
+                        if (data.type === 'tool_use_complete') {
+                            currentTextBlock = null;
+                            const block = { type: data.tool, data: data.input };
+                            this.streamingBlocks.push(block);
+                            if (data.tool === 'show_capital_chart') {
+                                const chartId = 'chat-chart-' + (++this._chartCounter);
+                                block._chartId = chartId;
+                                this.$nextTick(() => {
+                                    setTimeout(() => this._renderChartCanvas(chartId, data.input), 100);
+                                });
+                            }
+                            if (data.tool === 'show_comparison_chart') {
+                                const chartId = 'chat-chart-' + (++this._chartCounter);
+                                block._chartId = chartId;
+                                this.$nextTick(() => {
+                                    setTimeout(() => this._renderComparisonChart(chartId, data.input), 100);
+                                });
+                            }
+                        }
+
+                        if (data.type === 'complete') {
+                            this.chatMessages.push({
+                                role: 'assistant',
+                                content: '',
+                                blocks: [...this.streamingBlocks],
+                            });
+                            this.chatHistory.push({ role: 'user', content: text });
+                            const aText = this.streamingBlocks
+                                .filter(b => b.type === 'text')
+                                .map(b => b.content).join('\n');
+                            this.chatHistory.push({ role: 'assistant', content: aText });
+                            this.streamingBlocks = [];
+                            this.chatStreaming = false;
+
+                            // Re-render charts in finalized messages
+                            this.$nextTick(() => {
+                                const lastMsg = this.chatMessages[this.chatMessages.length - 1];
+                                if (lastMsg) {
+                                    lastMsg.blocks.forEach(b => {
+                                        if (b.type === 'show_capital_chart' && b._chartId) {
+                                            setTimeout(() => this._renderChartCanvas(b._chartId, b.data), 100);
+                                        }
+                                        if (b.type === 'show_comparison_chart' && b._chartId) {
+                                            setTimeout(() => this._renderComparisonChart(b._chartId, b.data), 100);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        if (data.type === 'error') {
+                            this.streamingBlocks.push({ type: 'text', content: 'Error: ' + data.message });
+                            this.chatMessages.push({ role: 'assistant', content: '', blocks: [...this.streamingBlocks] });
+                            this.streamingBlocks = [];
+                            this.chatStreaming = false;
+                        }
+                    }
+
+                    this.$nextTick(() => {
+                        if (this.$refs.chatScroll) this.$refs.chatScroll.scrollTop = this.$refs.chatScroll.scrollHeight;
+                    });
+                }
+
+                // Handle case where stream ended without a "complete" event
+                if (this.chatStreaming) {
+                    if (this.streamingBlocks.length > 0) {
+                        this.chatMessages.push({ role: 'assistant', content: '', blocks: [...this.streamingBlocks] });
+                        this.chatHistory.push({ role: 'user', content: text });
+                        const aText = this.streamingBlocks.filter(b => b.type === 'text').map(b => b.content).join('\n');
+                        this.chatHistory.push({ role: 'assistant', content: aText });
+                    }
+                    this.streamingBlocks = [];
+                    this.chatStreaming = false;
+                }
+
+            } catch (err) {
+                console.error('Chat error:', err);
+                this.streamingBlocks.push({ type: 'text', content: 'Connection error. Please try again.' });
+                this.chatMessages.push({ role: 'assistant', content: '', blocks: [...this.streamingBlocks] });
+                this.streamingBlocks = [];
+                this.chatStreaming = false;
+            }
+        },
+
+        renderBlock(block) {
+            if (block.type === 'text') {
+                return '<div class="chat-text text-sm text-gray-800 leading-relaxed">' + this._md(block.content) + '</div>';
+            }
+
+            if (block.type === 'show_capital_chart') {
+                const d = block.data || {};
+                const id = block._chartId || ('chat-chart-' + (++this._chartCounter));
+                block._chartId = id;
+                return '<div class="chat-block-card">' +
+                    '<div class="chat-block-title">' + this._esc(d.title || 'Capital Expenditures') + '</div>' +
+                    '<canvas id="' + id + '" height="200"></canvas>' +
+                    '</div>';
+            }
+
+            if (block.type === 'show_comparison_chart') {
+                const d = block.data || {};
+                const id = block._chartId || ('chat-chart-' + (++this._chartCounter));
+                block._chartId = id;
+                return '<div class="chat-block-card">' +
+                    '<div class="chat-block-title">' + this._esc(d.title || 'Plan Comparison') + '</div>' +
+                    '<canvas id="' + id + '" height="200"></canvas>' +
+                    '</div>';
+            }
+
+            if (block.type === 'show_cost_summary') {
+                const d = block.data || {};
+                let html = '<div class="chat-block-card">' +
+                    '<div class="chat-block-title">' + this._esc(d.title || 'Cost Summary') + '</div>' +
+                    '<div class="text-2xl font-bold text-gray-900 mb-3">$' + Number(d.total || 0).toLocaleString() + '</div>' +
+                    '<div class="space-y-2.5">';
+                (d.categories || []).forEach(cat => {
+                    const pct = cat.percentage || Math.round((cat.amount / (d.total || 1)) * 100);
+                    html += '<div>' +
+                        '<div class="flex justify-between text-xs mb-0.5">' +
+                        '<span class="text-gray-600">' + this._esc(cat.name) + '</span>' +
+                        '<span class="font-medium text-gray-900">$' + Number(cat.amount || 0).toLocaleString() + '</span>' +
+                        '</div>' +
+                        '<div class="w-full bg-gray-100 rounded-full h-1.5">' +
+                        '<div class="bg-rand-red h-1.5 rounded-full" style="width:' + Math.min(pct, 100) + '%"></div>' +
+                        '</div></div>';
+                });
+                html += '</div></div>';
+                return html;
+            }
+
+            if (block.type === 'show_observations') {
+                const d = block.data || {};
+                let html = '<div class="chat-block-card">' +
+                    '<div class="chat-block-title">' + this._esc(d.title || 'Observations') + '</div>' +
+                    '<div class="space-y-2">';
+                (d.observations || []).forEach(obs => {
+                    html += '<div class="chat-obs-card">' +
+                        '<span class="font-mono text-xs font-semibold text-rand-red shrink-0 mt-0.5">' + this._esc(obs.obs_number || '') + '</span>' +
+                        '<div class="flex-1 min-w-0">' +
+                        '<div class="text-sm text-gray-900">' + this._esc(obs.summary || '') + '</div>' +
+                        '<div class="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">';
+                    if (obs.system) html += '<span>' + this._esc(obs.system) + '</span>';
+                    if (obs.condition) html += '<span class="px-1.5 py-0.5 rounded-full ' + this.conditionBadge(obs.condition) + '">' + this._esc(obs.condition) + '</span>';
+                    if (obs.priority) html += '<span>' + this._esc(obs.priority) + '</span>';
+                    if (obs.cost_high) html += '<span class="font-medium">$' + Number(obs.cost_high).toLocaleString() + '</span>';
+                    html += '</div></div></div>';
+                });
+                html += '</div></div>';
+                return html;
+            }
+
+            if (block.type === 'show_action_items') {
+                const d = block.data || {};
+                let html = '<div class="chat-block-card">' +
+                    '<div class="chat-block-title">' + this._esc(d.title || 'Recommended Actions') + '</div>' +
+                    '<div>';
+                (d.items || []).forEach(item => {
+                    const urgency = item.urgency || 'medium';
+                    html += '<div class="chat-action-item">' +
+                        '<div class="urgency-dot urgency-' + urgency + '"></div>' +
+                        '<div class="flex-1 min-w-0">' +
+                        '<div class="text-sm text-gray-900">' + this._esc(item.action) + '</div>' +
+                        '<div class="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">';
+                    if (item.timeframe) html += '<span>' + this._esc(item.timeframe) + '</span>';
+                    if (item.estimated_cost) html += '<span class="font-medium text-gray-700">' + this._esc(item.estimated_cost) + '</span>';
+                    if (item.related_obs && item.related_obs.length) html += '<span class="text-rand-red">Obs: ' + item.related_obs.map(o => this._esc(o)).join(', ') + '</span>';
+                    html += '</div></div></div>';
+                });
+                html += '</div></div>';
+                return html;
+            }
+
+            return '';
+        },
+
+        _renderChartCanvas(canvasId, data) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            // Destroy existing chart if any
+            if (el._chartInstance) { el._chartInstance.destroy(); }
+
+            const periods = data.periods || [];
+            const labels = periods.map(p => p.label);
+            const catNames = [...new Set(periods.flatMap(p => (p.categories || []).map(c => c.name)))];
+            const colors = ['#E21836', '#1A1A1A', '#6b7280', '#d97706', '#2563eb', '#16a34a', '#7c3aed', '#db2777'];
+
+            const datasets = catNames.map((name, i) => ({
+                label: name,
+                data: periods.map(p => {
+                    const cat = (p.categories || []).find(c => c.name === name);
+                    return cat ? cat.amount : 0;
+                }),
+                backgroundColor: colors[i % colors.length] + 'cc',
+                borderColor: colors[i % colors.length],
+                borderWidth: 1,
+                borderRadius: 3,
+            }));
+
+            el._chartInstance = new Chart(el, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: catNames.length > 1, grid: { display: false } },
+                        y: {
+                            stacked: catNames.length > 1,
+                            ticks: { callback: v => v >= 1000000 ? '$' + (v/1000000).toFixed(1) + 'M' : '$' + Math.round(v/1000) + 'K', font: { size: 11 } },
+                            grid: { color: '#f3f4f6' },
+                        },
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString() },
+                        },
+                    },
+                },
+            });
+        },
+
+        _renderComparisonChart(canvasId, data) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            if (el._chartInstance) { el._chartInstance.destroy(); }
+
+            const labels = data.periods || [];
+            const scenarios = data.scenarios || [];
+            const colors = [
+                { bg: '#1A1A1Acc', border: '#1A1A1A' },
+                { bg: '#E21836cc', border: '#E21836' },
+                { bg: '#2563ebcc', border: '#2563eb' },
+            ];
+
+            const datasets = scenarios.map((s, i) => ({
+                label: s.name,
+                data: s.values || [],
+                backgroundColor: colors[i % colors.length].bg,
+                borderColor: colors[i % colors.length].border,
+                borderWidth: 1,
+                borderRadius: 4,
+            }));
+
+            el._chartInstance = new Chart(el, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => v >= 1000000 ? '$' + (v/1000000).toFixed(1) + 'M' : '$' + Math.round(v/1000) + 'K', font: { size: 11 } },
+                            grid: { color: '#f3f4f6' },
+                        },
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12, weight: '500' } } },
+                        tooltip: {
+                            callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString() },
+                        },
+                    },
+                },
+            });
+        },
+
+        _md(text) {
+            if (!text) return '';
+            let s = text
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '</p><p class="mt-2">')
+                .replace(/\n/g, '<br>');
+            return '<p>' + s + '</p>';
+        },
+
+        _esc(text) {
+            if (!text) return '';
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         },
 
         async saveChanges() {

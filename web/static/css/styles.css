@@ -245,3 +245,90 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* ── AI Chat Assistant ── */
+
+.chat-text p { margin-bottom: 0.5rem; }
+.chat-text p:last-child { margin-bottom: 0; }
+.chat-text strong { font-weight: 600; }
+.chat-text ul { list-style-type: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+.chat-text ol { list-style-type: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+.chat-text li { margin-bottom: 0.25rem; font-size: 0.875rem; }
+.chat-text code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+
+.chat-suggestion {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.chat-suggestion:hover {
+    border-color: #E21836;
+    color: #E21836;
+    background-color: #fef2f2;
+}
+
+.chat-block-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    padding: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.chat-block-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.75rem;
+}
+
+.chat-obs-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #f3f4f6;
+    transition: background 0.1s;
+}
+.chat-obs-card:hover { background: #f9fafb; }
+
+.chat-action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+.chat-action-item:last-child { border-bottom: none; }
+
+.urgency-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    margin-top: 0.375rem;
+    flex-shrink: 0;
+}
+.urgency-critical { background: #dc2626; }
+.urgency-high { background: #d97706; }
+.urgency-medium { background: #2563eb; }
+.urgency-low { background: #16a34a; }
+
+@keyframes chat-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+.chat-typing-dot {
+    animation: chat-pulse 1.2s ease-in-out infinite;
+}
+.chat-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing-dot:nth-child(3) { animation-delay: 0.4s; }

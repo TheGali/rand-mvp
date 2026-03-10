@@ -43,6 +43,7 @@ from web.job_store import (
 )
 from src.parser import parse_pptx
 from src.processor import process_report
+from src.chat import stream_chat_response, _aggregate_chart_categories
 
 app = FastAPI(title="RAND Survey Tool")
 
@@ -312,6 +313,63 @@ async def get_job_api(request: Request, job_id: str):
     if not job:
         return JSONResponse({"error": "Job not found"}, status_code=404)
     return JSONResponse(job)
+
+
+# ──────────────────────────── Chat Routes ────────────────────────────
+
+@app.post("/chat/{job_id}")
+async def chat_stream(request: Request, job_id: str):
+    """SSE endpoint — streams AI chat response with tool-use blocks."""
+    redirect = require_auth(request)
+    if redirect:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    job = get_job(job_id)
+    if not job or job["status"] != "completed":
+        return JSONResponse({"error": "Job not ready"}, status_code=400)
+
+    body = await request.json()
+    message = body.get("message", "").strip()
+    history = body.get("history", [])
+
+    if not message:
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+        queue = asyncio.Queue()
+
+        def run_chat():
+            for event_data in stream_chat_response(job, message, history):
+                evt_type = event_data.get("type", "")
+                evt_tool = event_data.get("tool", "")
+                # Post-process chart data to aggregate into systems
+                if evt_type == "tool_use_complete" and evt_tool == "show_capital_chart":
+                    try:
+                        aggregated = _aggregate_chart_categories(
+                            event_data["input"], job
+                        )
+                        event_data["input"] = aggregated
+                    except Exception:
+                        import traceback
+                        traceback.print_exc()
+                asyncio.run_coroutine_threadsafe(queue.put(event_data), loop)
+            asyncio.run_coroutine_threadsafe(queue.put(None), loop)  # sentinel
+
+        loop.run_in_executor(executor, run_chat)
+
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=120)
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") in ("complete", "error"):
+                    break
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ──────────────────────────── Report Routes ────────────────────────────
