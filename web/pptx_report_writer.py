@@ -108,6 +108,36 @@ def _add_cover_slide(prs, job):
         font_size=12, color=RGBColor(0x88, 0x99, 0xAA), align=PP_ALIGN.CENTER,
     )
 
+    # Draft watermark if any observation is unapproved
+    observations = job.get("processed_observations", [])
+    total = len(observations)
+    approved = sum(1 for o in observations if o.get("approved"))
+    if total > 0 and approved < total:
+        # Large diagonal "DRAFT" watermark with semi-transparency
+        wm = slide.shapes.add_textbox(Inches(1.5), Inches(1), Inches(10), Inches(5.5))
+        wm.rotation = -35
+        tf = wm.text_frame
+        tf.word_wrap = False
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        run = p.add_run()
+        run.text = "DRAFT"
+        run.font.size = Pt(120)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        # Set 40% opacity via XML alpha element
+        ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        srgb = run._r.get_or_add_rPr().find(f".//{ns}srgbClr")
+        etree.SubElement(srgb, f"{ns}alpha").set("val", "40000")
+
+        # Approval summary line below existing content
+        _add_text_box(
+            slide, Inches(1), Inches(5.0), Inches(11), Inches(0.5),
+            f"{approved}/{total} observations approved",
+            font_size=14, bold=True,
+            color=RGBColor(0xFF, 0x99, 0x99), align=PP_ALIGN.CENTER,
+        )
+
     return slide
 
 

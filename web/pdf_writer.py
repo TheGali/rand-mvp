@@ -121,6 +121,25 @@ def _add_cover(pdf, job):
     pdf.set_text_color(153, 170, 187)
     pdf.cell(0, 10, "Physical Condition Survey", align="C", new_x="LMARGIN", new_y="NEXT")
 
+    # Draft watermark if any observation is unapproved
+    observations = job.get("processed_observations", [])
+    total = len(observations)
+    approved = sum(1 for o in observations if o.get("approved"))
+    if total > 0 and approved < total:
+        # Large diagonal "DRAFT" watermark (semi-transparent white)
+        with pdf.local_context(fill_opacity=0.15):
+            pdf.set_font("Helvetica", "B", 80)
+            pdf.set_text_color(255, 255, 255)
+            with pdf.rotation(angle=-35, x=pdf.w / 2, y=pdf.h / 2):
+                pdf.set_xy(0, pdf.h / 2 - 20)
+                pdf.cell(pdf.w, 40, "DRAFT", align="C")
+
+        # Approval summary line
+        pdf.set_y(160)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(255, 153, 153)
+        pdf.cell(0, 10, f"{approved}/{total} observations approved", align="C", new_x="LMARGIN", new_y="NEXT")
+
     # RAND branding
     pdf.set_y(200)
     pdf.set_font("Helvetica", "", 10)
