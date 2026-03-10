@@ -171,12 +171,30 @@
                                 <div>Estimated Qty /</div>
                                 <div>Unit Cost / Unit</div>
                             </th>
-                            <th class="px-2 py-2 w-24 text-right">Curr. Rec.</th>
-                            <th class="px-2 py-2 w-24 text-right">Yrs 1-3</th>
-                            <th class="px-2 py-2 w-24 text-right">Yrs 4-6</th>
-                            <th class="px-2 py-2 w-24 text-right">Yrs 7-9</th>
-                            <th class="px-2 py-2 w-24 text-right">Yrs 10-12</th>
-                            <th class="px-2 py-2 w-24 text-right">Yrs 13-15</th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Current</div>
+                                <div>Recommendation</div>
+                            </th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Years 1-3</div>
+                                <div class="font-normal text-gray-400">2026-2028</div>
+                            </th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Years 4-6</div>
+                                <div class="font-normal text-gray-400">2029-2031</div>
+                            </th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Years 7-9</div>
+                                <div class="font-normal text-gray-400">2032-2034</div>
+                            </th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Years 10-12</div>
+                                <div class="font-normal text-gray-400">2035-2037</div>
+                            </th>
+                            <th class="px-2 py-2 w-28 text-right">
+                                <div>Years 13-15</div>
+                                <div class="font-normal text-gray-400">2038-2040</div>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -466,13 +484,12 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Priority</label>
                                     <select x-model="editFields.priority" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rand-red" @change="markDirty()">
-                                        <option value="Immediate">Immediate</option>
-                                        <option value="Year 1-2">Year 1-2</option>
-                                        <option value="Year 1-3">Year 1-3</option>
-                                        <option value="Year 3-5">Year 3-5</option>
-                                        <option value="Year 6-10">Year 6-10</option>
-                                        <option value="Year 10+">Year 10+</option>
-                                        <option value="Capital Planning">Capital Planning</option>
+                                        <option value="Immediate">Current Recommendation</option>
+                                        <option value="Year 1-3">Years 1-3 (2026-2028)</option>
+                                        <option value="Year 3-5">Years 4-6 (2029-2031)</option>
+                                        <option value="Year 6-10">Years 7-9 (2032-2034)</option>
+                                        <option value="Year 10+">Years 10-12 (2035-2037)</option>
+                                        <option value="Capital Planning">Years 13-15 (2038-2040)</option>
                                     </select>
                                 </div>
                             </div>
